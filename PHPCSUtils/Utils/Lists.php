@@ -65,17 +65,44 @@ class Lists
      */
     public static function isShortList(File $phpcsFile, $stackPtr)
     {
+		static $lastSeenList = [
+			'file'   => null,
+			'opener' => null,
+			'closer' => null,
+		];
+
+		$setLastSeen = function($lastSeenList, $fileName, $opener, $closer) {
+			// Prevent overwriting an outer list with an inner list.
+			if ($lastSeenList['file'] === $fileName
+				&& $lastSeenList['opener'] < $opener
+				&& $lastSeenList['closer'] > $closer
+			) {
+				return $lastSeenList;
+			}
+
+			return [
+				'file'   => $fileName,
+				'opener' => $opener,
+				'closer' => $closer,
+			];
+		};
+
         $tokens = $phpcsFile->getTokens();
 
         // Is this one of the tokens this function handles ?
         if (isset($tokens[$stackPtr]) === false
             || isset(Collections::$shortListTokensBC[$tokens[$stackPtr]['code']]) === false
         ) {
+//echo 'false: not a token handled', PHP_EOL;
             return false;
         }
 
         $phpcsVersion = Helper::getVersion();
-
+/*
+echo '=============================================',PHP_EOL;
+echo 'Line: ', $tokens[$stackPtr]['line'], ' | Token type: ', $tokens[$stackPtr]['type'], PHP_EOL;
+var_dump($lastSeenList);
+*/
         /*
          * BC: Work around a bug in the tokenizer of PHPCS 2.8.0 - 3.2.3 where a `[` would be
          * tokenized as T_OPEN_SQUARE_BRACKET instead of T_OPEN_SHORT_ARRAY if it was
@@ -102,6 +129,7 @@ class Lists
 
             if (isset($tokens[$opener]['bracket_closer']) === false) {
                 // Definitely not a short list.
+//echo 'false: no bracket closer', PHP_EOL;
                 return false;
             }
 
@@ -114,6 +142,9 @@ class Lists
                 $closer       = $tokens[$opener]['bracket_closer'];
                 $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
                 if ($nextNonEmpty !== false && $tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
+					// This is an "outer" list, update the $lastSeenList.
+					$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+//echo 'true: buggy one with assignment after', PHP_EOL;
                     return true;
                 }
             }
@@ -199,22 +230,90 @@ class Lists
                 break;
         }
 
+		// Check for short list assignment.
         $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
-        if ($nextNonEmpty !== false && $tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
+        if ($nextNonEmpty === false) {
+			// Parse error or live coding.
+//echo 'false: nothing after this', PHP_EOL;
+			return false;
+		}
+
+		if ($tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
+			$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+//echo 'true: outer list assignment', PHP_EOL;
             return true;
         }
 
         // Check for short list in foreach, i.e. `foreach($array as [$a, $b])`.
         $prevNonEmpty = $phpcsFile->findPrevious(Tokens::$emptyTokens, ($opener - 1), null, true);
-        if ($prevNonEmpty !== false
-            && ($tokens[$prevNonEmpty]['code'] === \T_AS
+        if (($tokens[$prevNonEmpty]['code'] === \T_AS
                 || $tokens[$prevNonEmpty]['code'] === \T_DOUBLE_ARROW)
             && Parentheses::lastOwnerIn($phpcsFile, $prevNonEmpty, \T_FOREACH) !== false
         ) {
+			// This is an "outer" list, update the $lastSeenList.
+			$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+//echo 'true: outer list foreach', PHP_EOL;
             return true;
         }
 
+		/*
+		 * Check if we already know this is a nested list.
+		 */
+		if ($lastSeenList['file'] === $phpcsFile->getFilename()) {
+
+			if ($lastSeenList['opener'] === $opener && $lastSeenList['closer'] === $closer) {
+//echo 'true: outer list, seen before', PHP_EOL;
+				return true;
+			}
+
+			if ($lastSeenList['opener'] < $opener && $lastSeenList['closer'] > $closer) {
+				// Now, we need to prevent false positives on brackets being used in list keys.
+				if ($tokens[$lastSeenList['opener']]['conditions'] === $tokens[$opener]['conditions']
+				&& ((isset($tokens[$lastSeenList['opener']]['nested_parenthesis']) === false
+						&& isset($tokens[$opener]['nested_parenthesis']) === false)
+					|| (isset($tokens[$lastSeenList['opener']]['nested_parenthesis'], $tokens[$opener]['nested_parenthesis'] )=== true
+					&& $tokens[$lastSeenList['opener']]['nested_parenthesis'] === $tokens[$opener]['nested_parenthesis']))
+					&& ($prevNonEmpty === $lastSeenList['opener']
+						|| $tokens[$prevNonEmpty]['code'] === \T_DOUBLE_ARROW
+						|| $tokens[$prevNonEmpty]['code'] === \T_COMMA)
+					&& ($nextNonEmpty === $lastSeenList['closer']
+						|| $tokens[$nextNonEmpty]['code'] === \T_COMMA)
+				) {
+					// No need to update the last seen list as we know this is a nested list.
+//echo 'true: nested list', PHP_EOL;
+		            return true;
+				}
+
+				// Short array within an outer short list. Most likely some convoluted key setting.
+//echo 'false: short array in nested list', PHP_EOL;
+				return false;
+			}
+		}
+
+// BELOW WILL ONLY WORK WHEN ALL BRACKETS ARE PASSED AND WE CANT BE SURE THEY ARE
+		/*
+		 * This is not an outer list with assignment or in a foreach, nor a nested list in a known
+		 * outer list, so we can be sure it's a short array.
+		 */
+/*
+		if ($lastSeenList['file'] !== null) {
+echo 'false: this is probably wrong', PHP_EOL;
+			return false;
+		}
+*/
+
+        /*
+		 * Check if this could be a list at all. Must have at least one variable inside.
+		 * This will also automatically discount empty lists, which are not allowed anyway.
+		 */
+        $varInside = $phpcsFile->findNext(\T_VARIABLE, ($opener + 1), $closer);
+        if ($varInside === false) {
+//echo 'false: no variable, so not a list', PHP_EOL;
+			return false;
+		}
+
         // Maybe this is a short list syntax nested inside another short list syntax ?
+/*
         $parentOpen = $opener;
         do {
             $parentOpen = $phpcsFile->findPrevious(
@@ -227,13 +326,161 @@ class Lists
             );
 
             if ($parentOpen === false) {
+echo 'false: reached start of file', PHP_EOL;
                 return false;
             }
         } while (isset($tokens[$parentOpen]['bracket_closer']) === true
             && $tokens[$parentOpen]['bracket_closer'] < $opener
         );
+*/
 
-        return self::isShortList($phpcsFile, $parentOpen);
+/*
+$lastSeenList = [
+	'filename' =>
+	'opener'   =>
+	'closer'   =>
+];
+
+// When finding prev -> skip over reference (bitwise and) ? <= Don't think this is necessary as ref can only be in front of variable in this case
+
+Nice other check which can be done: if there are no variables inside, it will never be a short list
+
+if (opener < currentOpen && closer > currentCloser && conditions === same && parentheses === same)
+   XXX THIS IS WRONG ??? or maybe not - it only has to make sense for lists!!! not for arrays.
+   VVV in which case, this may actually be correct.
+	if (token before current open === double arrow || token before current open === comma || === opener) && (after current close === comma || === closer)
+		return true
+	else
+		return false ???
+
+TODO: Check - can a list contain an empty list ? If not, those will always be array (or rather square brackets)
+plain empty -> invalid as of PHP 7, but if followed by = sign, recognize as short list
+nested empty -> fatal error and as short lists is 7.1, we could go either way here.
+
+CHECKED: mixing long/short list is not allowed, so if there is a condition list(), it will always be a short array
+
+TESTING: run over PHPCompat lists tests to verify!
+
+ */
+
+/*
+ TODO: maybe remember previous "false" and if opener < current opener + closer > current closer, limit token walking to
+ within that.
+ 
+ Also: if closer - current closer < current opener - opener, walk forward instead of backward
+*/
+
+		for ($i = ($opener - 1); $i >= 0; $i--) {
+			// Skip over block comments (just in case).
+			if ($tokens[$i]['code'] === \T_DOC_COMMENT_CLOSE_TAG) {
+				$i = $tokens[$i]['comment_opener'];
+				continue;
+			}
+
+			if (isset(Tokens::$emptyTokens[$tokens[$i]['code']]) === true) {
+				continue;
+			}
+
+			// Stop on an end of statement.
+			if ($tokens[$i]['code'] === \T_SEMICOLON) {
+				// End of previous statement.
+//echo 'false: reached end of previous statement', PHP_EOL;
+				return false;
+			}
+			
+			// Can we also stop on open curly with close curly after ?
+			// And on open parenthesis with closer after ?
+			// And on PHP open tags
+			// Maybe colon ? inline else ?
+
+			// Skip over all (close) braces
+			if (isset($tokens[$i]['scope_opener']) === true
+				&& $i === $tokens[$i]['scope_closer']
+			) {
+				if (isset($tokens[$i]['scope_owner']) === true) {
+					$i = $tokens[$i]['scope_owner'];
+					continue;
+				}
+
+				$i = $tokens[$i]['scope_opener'];
+				continue;
+			}
+
+			if (isset($tokens[$i]['parenthesis_opener']) === true
+				&& $i === $tokens[$i]['parenthesis_closer']
+			) {
+				$i = $tokens[$i]['parenthesis_opener'];
+				continue;
+			}
+
+			// If this is a close bracket, it's not the outer wrapper, so we can ignore it completely.
+			if (isset($tokens[$i]['bracket_opener']) === true
+				&& $i === $tokens[$i]['bracket_closer']
+			) {
+				$i = $tokens[$i]['bracket_opener'];
+				continue;
+			}
+
+			// Open brace
+			if (($tokens[$i]['code'] === \T_OPEN_SQUARE_BRACKET
+				|| $tokens[$i]['code'] === \T_OPEN_SHORT_ARRAY)
+				&& isset($tokens[$i]['bracket_closer']) === true
+				&& $tokens[$i]['bracket_closer'] > $closer
+			) {
+				// This is one we have to examine further as it could be the outer short list.
+				break;
+			}
+		}
+
+/*
+
+			$found = (bool) $exclude;
+			foreach ($types as $type) {
+				if ($this->tokens[$i]['code'] === $type) {
+					$found = !$exclude;
+					break;
+				}
+			}
+
+			if ($found === true) {
+				if ($value === null) {
+					return $i;
+				} else if ($this->tokens[$i]['content'] === $value) {
+					return $i;
+				}
+			}
+
+
+/*
+if isset scope_opener + scope closer && i === scope opener && scope closer > "list closer"
+return false
+
+if isset parenthesis_opener + parenthesis_closer && i === parenthesis_opener && parenthesis_closer > "list closer"
+return false
+
+
+
+            if ($local === true) {
+                if (isset($this->tokens[$i]['scope_opener']) === true
+                    && $i === $this->tokens[$i]['scope_closer']
+                ) {
+                    $i = $this->tokens[$i]['scope_opener'];
+                } else if (isset($this->tokens[$i]['bracket_opener']) === true
+                    && $i === $this->tokens[$i]['bracket_closer']
+                ) {
+                    $i = $this->tokens[$i]['bracket_opener'];
+                } else if (isset($this->tokens[$i]['parenthesis_opener']) === true
+                    && $i === $this->tokens[$i]['parenthesis_closer']
+                ) {
+                    $i = $this->tokens[$i]['parenthesis_opener'];
+                } else if ($this->tokens[$i]['code'] === T_SEMICOLON) {
+                    break;
+                }
+            }
+        }//end for
+*/
+//echo 'going back in for next loop round', PHP_EOL;
+        return self::isShortList($phpcsFile, $i);
     }
 
     /**

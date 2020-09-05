@@ -197,6 +197,36 @@ class Arrays
             }
         }
 
+		$opener = $stackPtr;
+        if (isset($tokens[$stackPtr]['bracket_opener'])
+			&& $stackPtr !== $tokens[$stackPtr]['bracket_opener']
+		) {
+            $opener = $tokens[$stackPtr]['bracket_opener'];
+        }
+
+		$closer = $stackPtr;
+        if (isset($tokens[$stackPtr]['bracket_closer'])
+			&& $stackPtr !== $tokens[$stackPtr]['bracket_closer']
+		) {
+            $opener = $tokens[$stackPtr]['bracket_closer'];
+        }
+
+        /*
+		 * Check if this could be a short list at all.
+		 * A list must have at least one variable inside and not be empty.
+		 */
+        $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
+        if ($nextNonEmpty === false) {
+			// This is an empty array.
+			return true;
+		}
+
+        $varInside = $phpcsFile->findNext(\T_VARIABLE, $nextNonEmpty, $closer);
+        if ($varInside === false) {
+			// No variables, so definitely not a list.
+			return true;
+		}
+
         // In all other circumstances, make sure this isn't a short list instead of a short array.
         return (Lists::isShortList($phpcsFile, $stackPtr) === false);
     }
