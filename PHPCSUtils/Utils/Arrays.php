@@ -197,35 +197,75 @@ class Arrays
             }
         }
 
-		$opener = $stackPtr;
+        $opener = $stackPtr;
         if (isset($tokens[$stackPtr]['bracket_opener'])
-			&& $stackPtr !== $tokens[$stackPtr]['bracket_opener']
-		) {
+            && $stackPtr !== $tokens[$stackPtr]['bracket_opener']
+        ) {
             $opener = $tokens[$stackPtr]['bracket_opener'];
         }
 
-		$closer = $stackPtr;
+        $closer = $stackPtr;
         if (isset($tokens[$stackPtr]['bracket_closer'])
-			&& $stackPtr !== $tokens[$stackPtr]['bracket_closer']
-		) {
-            $opener = $tokens[$stackPtr]['bracket_closer'];
+            && $stackPtr !== $tokens[$stackPtr]['bracket_closer']
+        ) {
+            $closer = $tokens[$stackPtr]['bracket_closer'];
         }
 
         /*
-		 * Check if this could be a short list at all.
-		 * A list must have at least one variable inside and not be empty.
-		 */
-        $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
-        if ($nextNonEmpty === false) {
-			// This is an empty array.
-			return true;
-		}
+         * If the array closer is followed by a semi-colon and some other tokens, we know for sure
+         * it is a short array and not a short list.
+         */
+        $nextAfterCloser = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
+        if ($nextAfterCloser !== false) {
+            if ($tokens[$nextAfterCloser]['code'] === \T_SEMICOLON
+                || $tokens[$nextAfterCloser]['code'] === \T_CLOSE_TAG
+                || $tokens[$nextAfterCloser]['code'] === \T_OPEN_SQUARE_BRACKET // Array dereferencing.
+            ) {
+                return true;
+            }
 
-        $varInside = $phpcsFile->findNext(\T_VARIABLE, $nextNonEmpty, $closer);
+            if ($tokens[$nextAfterCloser]['code'] === \T_CLOSE_PARENTHESIS) {
+                if (isset($tokens[$tokens[$nextAfterCloser]['code']]['parenthesis_owner']) === false
+                    || $tokens[$tokens[$nextAfterCloser]['code']]['parenthesis_owner'] !== \T_FOREACH
+                ) {
+// NOT 100% sure about this - what about function calls ? Can I think of an example ?
+                    return true
+                }
+
+                // Ok, so this is a foreach. If it's before the "as" it's an array, after it's a list.
+                $asToken = $phpcsFile->findNext(
+                    \T_AS,
+                    ($tokens[$nextAfterCloser]['parenthesis_opener'] + 1),
+                    $tokens[$nextAfterCloser]['parenthesis_closer']
+                );
+                if ($asToken === false) {
+                    // Parse error or live coding.
+                    return false;
+                }
+
+                if ($asToken > $closer) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        /*
+         * Check if this could be a short list at all.
+         * A list must have at least one variable inside and not be empty.
+         */
+        $nonEmptyInside = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
+        if ($nonEmptyInside === false) {
+            // This is an empty array.
+            return true;
+        }
+
+        $varInside = $phpcsFile->findNext(\T_VARIABLE, $nonEmptyInside, $closer);
         if ($varInside === false) {
-			// No variables, so definitely not a list.
-			return true;
-		}
+            // No variables, so definitely not a list.
+            return true;
+        }
 
         // In all other circumstances, make sure this isn't a short list instead of a short array.
         return (Lists::isShortList($phpcsFile, $stackPtr) === false);
