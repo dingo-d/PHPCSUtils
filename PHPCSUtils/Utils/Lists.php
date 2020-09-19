@@ -71,7 +71,7 @@ class Lists
 			'closer' => null,
 		];
 
-		$setLastSeen = function($lastSeenList, $fileName, $opener, $closer) {
+		$setLastSeenList = function($lastSeenList, $fileName, $opener, $closer) {
 			// Prevent overwriting an outer list with an inner list.
 			if ($lastSeenList['file'] === $fileName
 				&& $lastSeenList['opener'] < $opener
@@ -143,7 +143,7 @@ var_dump($lastSeenList);
                 $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
                 if ($nextNonEmpty !== false && $tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
 					// This is an "outer" list, update the $lastSeenList.
-					$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+					$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
 //echo 'true: buggy one with assignment after', PHP_EOL;
                     return true;
                 }
@@ -231,30 +231,14 @@ var_dump($lastSeenList);
         }
 
 		// Check for short list assignment.
-        $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
-        if ($nextNonEmpty === false) {
+        $prevBeforeOpener = $phpcsFile->findPrevious(Tokens::$emptyTokens, ($opener - 1), null, true);
+        $nextAfterCloser  = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
+
+        if ($nextAfterCloser === false) {
 			// Parse error or live coding.
 //echo 'false: nothing after this', PHP_EOL;
 			return false;
 		}
-
-		if ($tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
-			$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
-//echo 'true: outer list assignment', PHP_EOL;
-            return true;
-        }
-
-        // Check for short list in foreach, i.e. `foreach($array as [$a, $b])`.
-        $prevNonEmpty = $phpcsFile->findPrevious(Tokens::$emptyTokens, ($opener - 1), null, true);
-        if (($tokens[$prevNonEmpty]['code'] === \T_AS
-                || $tokens[$prevNonEmpty]['code'] === \T_DOUBLE_ARROW)
-            && Parentheses::lastOwnerIn($phpcsFile, $prevNonEmpty, \T_FOREACH) !== false
-        ) {
-			// This is an "outer" list, update the $lastSeenList.
-			$lastSeenList = $setLastSeen($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
-//echo 'true: outer list foreach', PHP_EOL;
-            return true;
-        }
 
 		/*
 		 * Check if we already know this is a nested list.
@@ -273,11 +257,11 @@ var_dump($lastSeenList);
 						&& isset($tokens[$opener]['nested_parenthesis']) === false)
 					|| (isset($tokens[$lastSeenList['opener']]['nested_parenthesis'], $tokens[$opener]['nested_parenthesis'] )=== true
 					&& $tokens[$lastSeenList['opener']]['nested_parenthesis'] === $tokens[$opener]['nested_parenthesis']))
-					&& ($prevNonEmpty === $lastSeenList['opener']
-						|| $tokens[$prevNonEmpty]['code'] === \T_DOUBLE_ARROW
-						|| $tokens[$prevNonEmpty]['code'] === \T_COMMA)
-					&& ($nextNonEmpty === $lastSeenList['closer']
-						|| $tokens[$nextNonEmpty]['code'] === \T_COMMA)
+					&& ($prevBeforeOpener === $lastSeenList['opener']
+						|| $tokens[$prevBeforeOpener]['code'] === \T_DOUBLE_ARROW
+						|| $tokens[$prevBeforeOpener]['code'] === \T_COMMA)
+					&& ($nextAfterCloser === $lastSeenList['closer']
+						|| $tokens[$nextAfterCloser]['code'] === \T_COMMA)
 				) {
 					// No need to update the last seen list as we know this is a nested list.
 //echo 'true: nested list', PHP_EOL;
@@ -289,6 +273,39 @@ var_dump($lastSeenList);
 				return false;
 			}
 		}
+
+		if ($tokens[$nextAfterCloser]['code'] === \T_EQUAL) {
+			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+//echo 'true: outer list assignment', PHP_EOL;
+            return true;
+        }
+
+        // Check for short list in foreach, i.e. `foreach($array as [$a, $b])`.
+        $lastParenthesisOwner = Parentheses::lastOwnerIn($phpcsFile, $opener, \T_FOREACH);
+        if ($lastParenthesisOwner !== false) {
+			$asToken = $phpcsFile->findNext(
+				\T_AS,
+				($tokens[$lastParenthesisOwner]['parenthesis_opener'] + 1),
+				$tokens[$lastParenthesisOwner]['parenthesis_closer']
+			);
+
+			if ($asToken === false) {
+				// Parse error.
+				return false;
+			}
+
+            // When in a foreach condition, there are only two options: array or list and we know which this is.
+            if ($opener > $asToken) {
+	            // This is an "outer" list, update the $lastSeenList, which is checked before this.
+				$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+				return true;
+			}
+
+			return false;
+		}
+
+
+
 
 // BELOW WILL ONLY WORK WHEN ALL BRACKETS ARE PASSED AND WE CANT BE SURE THEY ARE
 		/*

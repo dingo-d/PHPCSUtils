@@ -62,6 +62,34 @@ class Arrays
      */
     public static function isShortArray(File $phpcsFile, $stackPtr)
     {
+		/*
+		 * Set up mechanism to keep track of outer lists as the isShortList() function
+		 * is slow for nested lists.
+		 */
+		static $lastSeenList = [
+			'file'   => null,
+			'opener' => null,
+			'closer' => null,
+		];
+
+		$setLastSeenList = function($lastSeenList, $fileName, $opener, $closer) {
+			// Prevent overwriting an outer list with an inner list.
+			if ($lastSeenList['file'] === $fileName
+				&& $lastSeenList['opener'] < $opener
+				&& $lastSeenList['closer'] > $closer
+			) {
+				return $lastSeenList;
+			}
+
+			return [
+				'file'   => $fileName,
+				'opener' => $opener,
+				'closer' => $closer,
+			];
+		};
+		
+
+
         $tokens = $phpcsFile->getTokens();
 
         // Is this one of the tokens this function handles ?
@@ -211,48 +239,105 @@ class Arrays
             $closer = $tokens[$stackPtr]['bracket_closer'];
         }
 
-        /*
-         * If the array closer is followed by a semi-colon and some other tokens, we know for sure
-         * it is a short array and not a short list.
-         */
-        $nextAfterCloser = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
-        if ($nextAfterCloser !== false) {
-            if ($tokens[$nextAfterCloser]['code'] === \T_SEMICOLON
-                || $tokens[$nextAfterCloser]['code'] === \T_CLOSE_TAG
-                || $tokens[$nextAfterCloser]['code'] === \T_OPEN_SQUARE_BRACKET // Array dereferencing.
-            ) {
-                return true;
+/*
+TODO "cache" outer short list info from foreach + equal sign and check before doing anything else
+as with these changes, we won't be passing "outer" lists to the isShortList anymore, so that will become less efficient.
+*/
+        $prevBeforeOpener = $phpcsFile->findPrevious(Tokens::$emptyTokens, ($opener - 1), null, true);
+        $nextAfterCloser  = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
+
+        if ($nextAfterCloser === false) {
+			// Live coding. Undetermined. Array until told differently.
+			return true;
+		}
+
+		/*
+		 * Check if the cache to see if we already know this is a nested list and bow out if we can.
+		 */
+		if ($lastSeenList['file'] === $phpcsFile->getFilename()) {
+			if ($lastSeenList['opener'] === $opener && $lastSeenList['closer'] === $closer) {
+				// We've seen this list before.
+				return false;
+			}
+
+			if ($lastSeenList['opener'] < $opener && $lastSeenList['closer'] > $closer) {
+				// Now, we need to prevent false positives on brackets being used in list keys.
+				if ($tokens[$lastSeenList['opener']]['conditions'] === $tokens[$opener]['conditions']
+					&& ((isset($tokens[$lastSeenList['opener']]['nested_parenthesis']) === false
+						&& isset($tokens[$opener]['nested_parenthesis']) === false)
+					|| (isset($tokens[$lastSeenList['opener']]['nested_parenthesis'], $tokens[$opener]['nested_parenthesis'] )=== true
+						&& $tokens[$lastSeenList['opener']]['nested_parenthesis'] === $tokens[$opener]['nested_parenthesis']))
+					&& ($prevBeforeOpener === $lastSeenList['opener']
+						|| $tokens[$prevBeforeOpener]['code'] === \T_DOUBLE_ARROW
+						|| $tokens[$prevBeforeOpener]['code'] === \T_COMMA)
+					&& ($nextAfterCloser === $lastSeenList['closer']
+						|| $tokens[$nextAfterCloser]['code'] === \T_COMMA)
+				) {
+					// No need to update the last seen list as we know this is a nested list.
+		            return false;
+				}
+
+				// Short array within an outer short list. Most likely some convoluted key setting.
+				return true;
+			}
+		}
+
+		// If the array closer is followed by an equals sign, it's always a short list.
+        if ($tokens[$nextAfterCloser]['code'] === \T_EQUAL) {
+            // This is an "outer" list, update the $lastSeenList.
+			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+            return false;
+        }
+
+        // Check for short array in foreach, i.e. `foreach([1, 2, 3] as $value])`.
+        $lastParenthesisOwner = Parentheses::lastOwnerIn($phpcsFile, $opener, \T_FOREACH);
+        if ($lastParenthesisOwner !== false) {
+
+            $asToken = $phpcsFile->findNext(
+                \T_AS,
+                ($tokens[$lastParenthesisOwner]['parenthesis_opener'] + 1),
+                $tokens[$lastParenthesisOwner]['parenthesis_closer']
+            );
+
+            if ($asToken === false) {
+                // Parse error.
+                return false;
             }
 
-            if ($tokens[$nextAfterCloser]['code'] === \T_CLOSE_PARENTHESIS) {
-                if (isset($tokens[$tokens[$nextAfterCloser]['code']]['parenthesis_owner']) === false
-                    || $tokens[$tokens[$nextAfterCloser]['code']]['parenthesis_owner'] !== \T_FOREACH
-                ) {
-// NOT 100% sure about this - what about function calls ? Can I think of an example ?
-                    return true
-                }
+            // When in a foreach condition, there are only two options: array or list and we know which this is.
+            if ($closer < $asToken) {
+				return true;
+			}
 
-                // Ok, so this is a foreach. If it's before the "as" it's an array, after it's a list.
-                $asToken = $phpcsFile->findNext(
-                    \T_AS,
-                    ($tokens[$nextAfterCloser]['parenthesis_opener'] + 1),
-                    $tokens[$nextAfterCloser]['parenthesis_closer']
-                );
-                if ($asToken === false) {
-                    // Parse error or live coding.
-                    return false;
-                }
-
-                if ($asToken > $closer) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
+            // This is an "outer" list, update the $lastSeenList, which is checked before this.
+			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+			return false;
         }
 
         /*
-         * Check if this could be a short list at all.
+         * If the array closer is not followed by an equals sign, list closing bracket or a comma
+		 * and is not in a foreach condition, we know for sure it is a short array and not a short list.
+         * The comma is the most problematic one as that can mean a nested short array or nested short list.
+         */
+        if ($tokens[$nextAfterCloser]['code'] === \T_CLOSE_SHORT_ARRAY
+	        || $tokens[$nextAfterCloser]['code'] === \T_CLOSE_SQUARE_BRACKET
+		) {
+// Should this be short list or short array ?
+			if (self::isShortArray($phpcsFile, $nextAfterCloser) === true) {
+				// LastSeenList will have been updated in the function call in the condition.
+	            return true;
+			}
+
+			return false;
+        }
+
+        if ($tokens[$nextAfterCloser]['code'] !== \T_COMMA) {
+            // Definitely short array.
+            return true;
+        }
+
+        /*
+         * Check if this could be a (nested) short list at all.
          * A list must have at least one variable inside and not be empty.
          */
         $nonEmptyInside = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
@@ -260,15 +345,20 @@ class Arrays
             // This is an empty array.
             return true;
         }
-
+// This will be slow for large nested arrays.
         $varInside = $phpcsFile->findNext(\T_VARIABLE, $nonEmptyInside, $closer);
         if ($varInside === false) {
             // No variables, so definitely not a list.
             return true;
         }
 
-        // In all other circumstances, make sure this isn't a short list instead of a short array.
-        return (Lists::isShortList($phpcsFile, $stackPtr) === false);
+        // In all other circumstances, make sure this isn't a (nested) short list instead of a short array.
+        if (Lists::isShortList($phpcsFile, $stackPtr) === false) {
+			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+			return true;
+		}
+
+		return false;
     }
 
     /**
