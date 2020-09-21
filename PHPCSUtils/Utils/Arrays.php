@@ -15,6 +15,7 @@ use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
 use PHPCSUtils\Tokens\Collections;
+use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\FunctionDeclarations;
 use PHPCSUtils\Utils\Lists;
 
@@ -290,29 +291,17 @@ as with these changes, we won't be passing "outer" lists to the isShortList anym
         }
 
         // Check for short array in foreach, i.e. `foreach([1, 2, 3] as $value])`.
-        $lastParenthesisOwner = Parentheses::lastOwnerIn($phpcsFile, $opener, \T_FOREACH);
-        if ($lastParenthesisOwner !== false) {
-
-            $asToken = $phpcsFile->findNext(
-                \T_AS,
-                ($tokens[$lastParenthesisOwner]['parenthesis_opener'] + 1),
-                $tokens[$lastParenthesisOwner]['parenthesis_closer']
-            );
-
-            if ($asToken === false) {
-                // Parse error.
-                return false;
-            }
-
+        $inForeach = Context::inForeachCondition($phpcsFile, $opener);
+        if ($inForeach !== false) {
             // When in a foreach condition, there are only two options: array or list and we know which this is.
-            if ($closer < $asToken) {
+            if ($inForeach === 'beforeAs') {
 				return true;
 			}
 
             // This is an "outer" list, update the $lastSeenList, which is checked before this.
 			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
 			return false;
-        }
+		}
 
         /*
          * If the array closer is not followed by an equals sign, list closing bracket or a comma

@@ -15,6 +15,7 @@ use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
 use PHPCSUtils\Tokens\Collections;
+use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\GetTokensAsString;
 use PHPCSUtils\Utils\Parentheses;
 
@@ -281,21 +282,10 @@ var_dump($lastSeenList);
         }
 
         // Check for short list in foreach, i.e. `foreach($array as [$a, $b])`.
-        $lastParenthesisOwner = Parentheses::lastOwnerIn($phpcsFile, $opener, \T_FOREACH);
-        if ($lastParenthesisOwner !== false) {
-			$asToken = $phpcsFile->findNext(
-				\T_AS,
-				($tokens[$lastParenthesisOwner]['parenthesis_opener'] + 1),
-				$tokens[$lastParenthesisOwner]['parenthesis_closer']
-			);
-
-			if ($asToken === false) {
-				// Parse error.
-				return false;
-			}
-
+        $inForeach = Context::inForeachCondition($phpcsFile, $opener);
+        if ($inForeach !== false) {
             // When in a foreach condition, there are only two options: array or list and we know which this is.
-            if ($opener > $asToken) {
+            if ($inForeach === 'afterAs') {
 	            // This is an "outer" list, update the $lastSeenList, which is checked before this.
 				$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
 				return true;
@@ -303,7 +293,6 @@ var_dump($lastSeenList);
 
 			return false;
 		}
-
 
 
 
