@@ -69,7 +69,7 @@ foreach ($data as ["id" => $id, "name" => $name]) {}
 echo 'just here to prevent the below test running into a tokenizer issue tested separately';
 
 /* testShortlistMultiAssign */
-$foo = [$baz, $bat] = /* testShortArrayMultiAssign */ [$a, $b];
+$foo = [$baz, $bat] = /* testShortArrayMultiAssign */ [$a, $b] + [$c, $d];
 
 /* testShortArrayWithNestingAndKeys */
 $array = [
@@ -91,6 +91,45 @@ $array = [
     ["x" => $x3, "y" => $y3],
 ] = $points;
 
+/* testShortListWithShortArrayAsKey */
+[/* testShortArrayAsKeyForShortList */[1,2,3][$a] => /* testShortListWithShortArrayAsKeyNested */ [$a, $b]] = $array;
+
+/* testShortListWithShortArrayInKey */
+// Please sack anyone who writes code like this.
+[
+    /* testShortArrayInKeyForShortListA */
+    function($a = [1,2,3]) {
+        return $a[$b];
+    }(/* testShortArrayInKeyForShortListB */[1,2,3]) => /* testShortListWithShortArrayInKeyNested */ [$a, $b]
+] = $array;
+
+[/* testNestedShortListWithEmpties */[,,$a]] = $array;
+
+/* ---------- NOT IN Data provider YET ----------- */
+
+$array = [
+    'key1' => function($a, $b) {
+        /* testShortListInShortArray */
+        ['a' => $a, /* testArrayAccessForShortListKey */ $key['b'] => /* testNestedShortListInShortArray */ [$b]] =
+            /* testShortArrayInShortArray */
+            [$a, /* testNestedShortArrayInShortArray */ [$b]];
+        return $a;
+    },
+    /* testNestedShortArrayInFunctionCall */
+    'key2' => function_call([$a, $b]),
+    /* testPlainShortListInShortArray */
+    'key3' => [$a, $b] = $foo,
+    /* testPlainShortListInShortArrayNoKey */
+    [$a, $b] = $foo,
+    /* testKeyedShortListInShortArrayWithArrayDerefInKey */
+    'key4' => [ /* testShortArrayInShortList */['a', 'b'] /* testArrayDeref */[0] => $a] = $foo,
+    /* testKeyedShortListInShortArrayWithFunctionCallKey */
+    'key5' => [ get_key( /* testShortArrayInShortList */ ['a', 'b']) => $a] = $foo,
+    'key6' => [ $a, /* testEmptyInShortList */ [], $b ] = $foo,
+    'key7' => [ $a , /* testNoVariables */ [ '10', '20' ] ] = $foo,
+];
+
+/* ---------- END - NOT IN Data provider YET ----------- */
 
 /* ===== Tests involving various illegal syntaxes/parse errors. ===== */
 
@@ -106,6 +145,10 @@ $array = [
 /* testShortListNestedLongList */
 // Invalid list as mixing short list syntax with list() is not allowed, but it is short list syntax.
 [list($a, $b), list($c, $d)] = [[1, 2], [3, 4]];
+
+/* testForeachWithoutAs */
+// Parse error.
+foreach([1,2,3]) {}
 
 /* testNestedAnonClassWithTraitUseAs */
 // Parse error, but not our concern, it is short array syntax.

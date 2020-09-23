@@ -387,6 +387,64 @@ class IsShortArrayOrListTest extends UtilityMethodTestCase
                     'list'  => true,
                 ],
             ],
+            'short-list-containing-short-array-as-key' => [
+                '/* testShortListWithShortArrayAsKey */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+            'short-array-as-key-for-nested-short-list' => [
+                '/* testShortArrayAsKeyForShortList */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-list-nested-with-array-key' => [
+                '/* testShortListWithShortArrayAsKeyNested */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+            'short-list-containing-short-array-in-key' => [
+                '/* testShortListWithShortArrayInKey */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+            'short-array-in-key-for-short-list-closure-default' => [
+                '/* testShortArrayInKeyForShortListA */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-in-key-for-short-list-closure-call-param' => [
+                '/* testShortArrayInKeyForShortListB */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-list-nested-with-array-in-key' => [
+                '/* testShortListWithShortArrayInKeyNested */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+            'short-list-nested-with-empties' => [
+                '/* testNestedShortListWithEmpties */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+
+            // Invalid syntaxes.
             'short-list-nested-empty' => [
                 '/* testNestedShortListEmpty */',
                 [
@@ -413,6 +471,13 @@ class IsShortArrayOrListTest extends UtilityMethodTestCase
                 [
                     'array' => false,
                     'list'  => true,
+                ],
+            ],
+            'parse-error-foreach-without-as' => [
+                '/* testForeachWithoutAs */',
+                [
+                    'array' => false, // = Unknown.
+                    'list'  => false, // = Unknown.
                 ],
             ],
             'parse-error-anon-class-trait-use-as' => [
