@@ -582,8 +582,8 @@ class IsShortArrayOrListTest extends UtilityMethodTestCase
             'parse-error-foreach-without-as' => [
                 '/* testForeachWithoutAs */',
                 [
-                    'array' => false, // = Unknown.
-                    'list'  => false, // = Unknown.
+                    'array' => true, // Unknown from a foreach perspective, but then the "normal" rules kick in.
+                    'list'  => false,
                 ],
             ],
             'parse-error-anon-class-trait-use-as' => [
