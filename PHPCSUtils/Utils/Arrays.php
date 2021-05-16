@@ -14,6 +14,7 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
+use PHPCSUtils\Internal\IsShortArrayOrList;
 use PHPCSUtils\Tokens\Collections;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\FunctionDeclarations;
@@ -63,6 +64,13 @@ class Arrays
      */
     public static function isShortArray(File $phpcsFile, $stackPtr)
     {
+		static $isShortArrayOrList;
+		
+		if (isset($isShortArrayOrList) === false) {
+			$isShortArrayOrList = IsShortArrayOrList::getInstance();
+		}
+
+
 		/*
 		 * Set up mechanism to keep track of outer lists as the isShortList() function
 		 * is slow for nested lists.

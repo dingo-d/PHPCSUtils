@@ -14,6 +14,7 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
+use PHPCSUtils\Internal\IsShortArrayOrList;
 use PHPCSUtils\Tokens\Collections;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\GetTokensAsString;
@@ -66,6 +67,12 @@ class Lists
      */
     public static function isShortList(File $phpcsFile, $stackPtr)
     {
+		static $isShortArrayOrList;
+		
+		if (isset($isShortArrayOrList) === false) {
+			$isShortArrayOrList = IsShortArrayOrList::getInstance();
+		}
+
 		static $lastSeenList = [
 			'file'   => null,
 			'opener' => null,
