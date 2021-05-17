@@ -464,6 +464,13 @@ final class IsShortArrayOrList
 			return self::SHORT_ARRAY;
 		}
 
+		// If the array opener is preceded by an equals sign, and we already know it isn't followed
+		// by one (check above), it's always a short array.
+		if ($this->tokens[$prevBeforeOpener]['code'] === \T_EQUAL) {
+			return self::SHORT_ARRAY;
+		}
+
+
 		/* If the array closer is followed by a double arrow, it's always a short list.
 // Needs tests for match expressions as I'm pretty sure it will bork on those.
 		if ($tokens[$nextAfterCloser]['code'] === \T_DOUBLE_ARROW) {
@@ -474,8 +481,8 @@ final class IsShortArrayOrList
 		/*
 		 * Check if this is a foreach expression.
 		 *
-		 * If the bracket is before the as, it will be a short array, i.e. `foreach([1, 2, 3] as $value])`.
-		 * Otherwise, it will be a short list, i.e. `foreach($array as [$a, $b])`.
+		 * If the bracket is before the AS and it's the outer array, it will be a short array, i.e. `foreach([1, 2, 3] as $value])`.
+		 * If it's after the AS, it will be a short list, i.e. `foreach($array as [$a, $b])`.
 		 */
 		$inForeach = Context::inForeachCondition($this->phpcsFile, $this->opener);
 		if ($inForeach !== false) {
@@ -488,8 +495,11 @@ final class IsShortArrayOrList
 					break;
 
 				case 'afterAs':
-					return self::SHORT_LIST;
+					if ($this->tokens[$prevBeforeOpener]['code'] === \T_AS) {
+						return self::SHORT_LIST;
+					}
 
+					break;
 			}
 /*
 			// When in a foreach condition, there are only two options: array or list and we know which this is.
