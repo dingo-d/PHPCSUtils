@@ -1088,6 +1088,8 @@ TESTING: run over PHPCompat lists tests to verify!
 			// And on open parenthesis with closer after ?
 			// And on PHP open tags
 			// Maybe colon ? inline else ?
+// HELL YES! Need to stop as soon as possible.
+// Even more important now with match in the picture.
 
 			// Skip over all (close) braces
 			if (isset($tokens[$i]['scope_opener']) === true
