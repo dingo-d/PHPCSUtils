@@ -438,7 +438,7 @@ final class IsShortArrayOrList
 			// Live coding. Short array until told differently.
 			return self::SHORT_ARRAY;
 		}
-		
+
 		$type = $this->checkCacheForOuterBrackets($prevBeforeOpener, $nextAfterCloser);
 		if (empty($type) === false) {
 			return $type;
@@ -495,7 +495,7 @@ final class IsShortArrayOrList
 					break;
 
 				case 'afterAs':
-					if ($this->tokens[$prevBeforeOpener]['code'] === \T_AS) {
+					if ($this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_PARENTHESIS) {
 						return self::SHORT_LIST;
 					}
 
@@ -1179,5 +1179,45 @@ return false
 */
 //echo 'going back in for next loop round', PHP_EOL;
 		return self::isShortList($phpcsFile, $i);
+		
+		
+/*
+ORIGINAL CODE:
+        $nextNonEmpty = $phpcsFile->findNext(Tokens::$emptyTokens, ($closer + 1), null, true);
+        if ($nextNonEmpty !== false && $tokens[$nextNonEmpty]['code'] === \T_EQUAL) {
+            return true;
+        }
+
+        // Check for short list in foreach, i.e. `foreach($array as [$a, $b])`.
+        $prevNonEmpty = $phpcsFile->findPrevious(Tokens::$emptyTokens, ($opener - 1), null, true);
+        if ($prevNonEmpty !== false
+            && ($tokens[$prevNonEmpty]['code'] === \T_AS
+                || $tokens[$prevNonEmpty]['code'] === \T_DOUBLE_ARROW)
+            && Parentheses::lastOwnerIn($phpcsFile, $prevNonEmpty, \T_FOREACH) !== false
+        ) {
+            return true;
+        }
+
+        // Maybe this is a short list syntax nested inside another short list syntax ?
+        $parentOpen = $opener;
+        do {
+            $parentOpen = $phpcsFile->findPrevious(
+                [\T_OPEN_SHORT_ARRAY, \T_OPEN_SQUARE_BRACKET], // BC: PHPCS#1971.
+                ($parentOpen - 1),
+                null,
+                false,
+                null,
+                true
+            );
+
+            if ($parentOpen === false) {
+                return false;
+            }
+        } while (isset($tokens[$parentOpen]['bracket_closer']) === true
+            && $tokens[$parentOpen]['bracket_closer'] < $opener
+        );
+
+        return self::isShortList($phpcsFile, $parentOpen);
+*/
 	}
 }
