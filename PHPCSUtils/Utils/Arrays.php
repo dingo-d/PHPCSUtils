@@ -64,11 +64,7 @@ class Arrays
      */
     public static function isShortArray(File $phpcsFile, $stackPtr)
     {
-		static $isShortArrayOrList;
-		
-		if (isset($isShortArrayOrList) === false) {
-			$isShortArrayOrList = IsShortArrayOrList::getInstance();
-		}
+		return IsShortArrayOrList::isShortArray($phpcsFile, $stackPtr);
 
 
 		/*

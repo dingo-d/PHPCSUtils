@@ -67,11 +67,8 @@ class Lists
      */
     public static function isShortList(File $phpcsFile, $stackPtr)
     {
-		static $isShortArrayOrList;
-		
-		if (isset($isShortArrayOrList) === false) {
-			$isShortArrayOrList = IsShortArrayOrList::getInstance();
-		}
+		return IsShortArrayOrList::isShortList($phpcsFile, $stackPtr);
+
 
 		static $lastSeenList = [
 			'file'   => null,
