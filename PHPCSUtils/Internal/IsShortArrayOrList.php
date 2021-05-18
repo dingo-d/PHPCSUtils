@@ -254,6 +254,17 @@ Probably not needed.
 			return IsShortArrayOrListWithCache::getType($this->phpcsFile, $nextAfterCloser);
 		}
 
+		if ($this->tokens[$prevBeforeOpener]['code'] === \T_OPEN_SHORT_ARRAY
+			|| $this->tokens[$prevBeforeOpener]['code'] === \T_OPEN_SQUARE_BRACKET
+		) {
+			if ($this->tokens[$nextAfterCloser]['code'] === \T_DOUBLE_ARROW) {
+				// Array key within short list is the only option here.
+				return self::SHORT_ARRAY;
+            }
+
+			return IsShortArrayOrListWithCache::getType($this->phpcsFile, $nextAfterCloser);
+		}
+
 		/*
 		 * If the array closer is not followed by an equals sign, list closing bracket or a comma
 		 * and is not in a foreach condition, we know for sure it is a short array and not a short list.
@@ -265,10 +276,16 @@ Probably not needed.
 			return self::SHORT_ARRAY;
 		}
 
-		// If the array opener is preceded by an equals sign, and we already know it isn't followed
-		// by one (check above), it's always a short array.
-// Can't imagine this condition ever getting hit.
-		if ($this->tokens[$prevBeforeOpener]['code'] === \T_EQUAL) {
+
+		// Okay, so as of here, we know this set of brackets is followed by a comma.
+		
+		/*
+		 * If there is anything, but a comma or double arrow (or bracket opener, but that is handled above)
+		 * before this set of brackets, it can only ever be a short array.
+		 */
+		if ($this->tokens[$prevBeforeOpener]['code'] !== \T_COMMA
+			&& $this->tokens[$prevBeforeOpener]['code'] !== \T_DOUBLE_ARROW
+		) {
 			return self::SHORT_ARRAY;
 		}
 
@@ -277,7 +294,7 @@ Probably not needed.
 		 * Check if this could be a (nested) short list at all.
 		 * A list must have at least one variable inside and can not be empty.
 		 */
-		$nonEmptyInside = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
+		$nonEmptyInside = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($this->opener + 1), $this->closer, true);
 		if ($nonEmptyInside === false) {
 			// This is an empty array.
 			return self::SHORT_ARRAY;
@@ -290,15 +307,17 @@ Probably not needed.
 		if ($type !== false) {
 			return $type;
 		}
-
+/*
 		// In all other circumstances, make sure this isn't a (nested) short list instead of a short array.
-		if (Lists::isShortList($phpcsFile, $stackPtr) === false) {
+		if (Lists::isShortList($this->phpcsFile, $stackPtr) === false) {
 			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
 			return true;
 		}
 
 		return false;
+*/
 
+  		return '';
 	}
 
 
@@ -520,8 +539,18 @@ $array = [
 	{
 		$count = 0;
 		
+		/*
+		if entry starts with [:
+
+		- array before => the outer will be short list
+		- plain no key -> underdetermined, can still be both
+		- if not var nor [ => always array
+		*/
+
+
+
 // This will be slow for large nested arrays.
-		$varInside = $phpcsFile->findNext(\T_VARIABLE, $nonEmptyInside, $closer);
+		$varInside = $this->phpcsFile->findNext(\T_VARIABLE, $this->opener, $this->closer);
 		if ($varInside === false) {
 			// No variables, so definitely not a list.
 			return true;
@@ -904,9 +933,10 @@ TESTING: run over PHPCompat lists tests to verify!
 			// Can we also stop on open curly with close curly after ?
 			// And on open parenthesis with closer after ?
 			// And on PHP open tags
-			// Maybe colon ? inline else ?
+			// Maybe colon ? inline else ? probably also null coalesce -> check findStartOfStatement list
 // HELL YES! Need to stop as soon as possible.
 // Even more important now with match in the picture.
+// Maybe also check $condition and $nested_parenthesis for being the same
 
 			// Skip over all (close) braces
 			if (isset($tokens[$i]['scope_opener']) === true
