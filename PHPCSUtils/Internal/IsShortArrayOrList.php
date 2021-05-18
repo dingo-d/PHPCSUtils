@@ -146,7 +146,6 @@ final class IsShortArrayOrList
 	 *
 	 * @return string|false The type of construct this bracket was determined to be.
 	 *                      Either 'short array', 'short list' or 'square brackets'.
-	 *                      Or FALSE is this was not a bracket token.
 	 */
 	public function process()
 	{
@@ -249,23 +248,18 @@ Probably not needed.
 */
 		}
 
+		if ($this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SHORT_ARRAY
+			|| $this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SQUARE_BRACKET
+		) {
+			return IsShortArrayOrListWithCache::getType($this->phpcsFile, $nextAfterCloser);
+		}
+
 		/*
 		 * If the array closer is not followed by an equals sign, list closing bracket or a comma
 		 * and is not in a foreach condition, we know for sure it is a short array and not a short list.
 		 * The comma is the most problematic one as that can mean a nested short array or nested short list.
 		 */
-		if ($this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SHORT_ARRAY
-			|| $this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SQUARE_BRACKET
-		) {
-// Should this be short list or short array ?
-
-// Beware: doing it this way, the results of the "outer" array will not be added to the cache....
-//			$instance = new self($this->phpcsFile, $nextAfterCloser, $this->cache);
-//			return $instance->process();
-
-			return IsShortArrayOrListWithCache::getType($this->phpcsFile, $nextAfterCloser);
-		}
-
+// TODO: This needs revisiting for match expressions. Handle this later, separately from this refactor.
 		if ($this->tokens[$nextAfterCloser]['code'] !== \T_COMMA) {
 			// Definitely short array.
 			return self::SHORT_ARRAY;
@@ -278,11 +272,38 @@ Probably not needed.
 			return self::SHORT_ARRAY;
 		}
 
+// From arrays:
+		/*
+		 * Check if this could be a (nested) short list at all.
+		 * A list must have at least one variable inside and can not be empty.
+		 */
+		$nonEmptyInside = $phpcsFile->findNext(Tokens::$emptyTokens, ($opener + 1), $closer, true);
+		if ($nonEmptyInside === false) {
+			// This is an empty array.
+			return self::SHORT_ARRAY;
+		} elseif ($this->tokens[$nonEmptyInside]['code'] === \T_COMMA) {
+			// An array can not start with an empty entry, a list can.
+			return self::SHORT_LIST;
+		}
+		
+		$type = $this->walkInside();
+		if ($type !== false) {
+			return $type;
+		}
+
+		// In all other circumstances, make sure this isn't a (nested) short list instead of a short array.
+		if (Lists::isShortList($phpcsFile, $stackPtr) === false) {
+			$lastSeenList = $setLastSeenList($lastSeenList, $phpcsFile->getFilename(), $opener, $closer);
+			return true;
+		}
+
+		return false;
+
 	}
 
 
 	/**
-	 * TODO
+	 * Verify that the current open bracket is not affected by known PHPCS cross-version tokenizer issues.
 	 *
 	 * @since 1.0.0
 	 *
@@ -418,11 +439,11 @@ Probably not needed.
 	 *                              the closer of the current set of brackets.
 	 *
 	 * @return string|false The determined type /*(which could be an empty string) ??? * /
-	 *                      or FALSE if no cache entries were found for the file this token came from.
+	 *                      or FALSE if no cache entries were found for this token came from.
 	 */
 	protected function checkCacheForOuterBrackets($prevBeforeOpener, $nextAfterCloser)
 	{
-		if (empty($this->cache) === false) {
+		if (empty($this->cache) === true) {
 			return false;
 		}
 		
@@ -432,13 +453,24 @@ Probably not needed.
 
 		foreach ($seenBrackets as $opener => $bracketInfo) {
 			if ($bracketInfo['opener'] < $this->opener && $bracketInfo['closer'] > $this->closer) {
-				// Catch just one typical array ase as we're walking the seen brackets cache anyway.
+				// Catch just typical array case as we're walking the seen brackets cache anyway.
 				if ($bracketInfo['type'] === self::SHORT_ARRAY
 					&& $bracketInfo['closer'] === $nextAfterCloser
 				) {
 					return self::SHORT_ARRAY;
 				}
-
+// TODO: doesn't the same as for lists also apply to short arrays ?
+// i.e. if same condition + nesting + previous is comma or double arrow or opener and next is comma or closer -> always short array ?
+// No, it does not, this gets into trouble when a nested short list is in a short array as they may look the same and the token of
+// the short list may not have been passed.
+/* TODO: verify these test cases are covered:
+$array = [
+    'key' => [$a, $b, [$c]] = $foo,
+    'key' => [[$a], $b, $c] = $foo,
+    'key' => [$a, [$b], $c] = $foo,
+    'key' => [$a, 'key' => [$b], $c] = $foo,
+];
+*/
 				if ($bracketInfo['type'] !== self::SHORT_LIST) {
 					// Only interested in short lists as short arrays can still contain anything.
 					continue;
@@ -477,6 +509,25 @@ Probably not needed.
 	}
 
 
+	/**
+	 * Walk the first part of the contents of the brackets to see if we can determine if this is an array or short list.
+	 *
+	 * This won't walk the complete contents as that could be a huge performance drain. Just the first x tokens.
+	 *
+	 * @return string|false The determined type or FALSE if undetermined.
+	 */
+	protected function walkInside()
+	{
+		$count = 0;
+		
+// This will be slow for large nested arrays.
+		$varInside = $phpcsFile->findNext(\T_VARIABLE, $nonEmptyInside, $closer);
+		if ($varInside === false) {
+			// No variables, so definitely not a list.
+			return true;
+		}
+
+	}
 
 /*
 If close bracket is followed by a =>, it will always be a short list (providing it isn't a real square bracket $a['key'])
