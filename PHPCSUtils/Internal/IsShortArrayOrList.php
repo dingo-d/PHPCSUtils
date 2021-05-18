@@ -36,6 +36,9 @@ use PHPCSUtils\Utils\Lists;
  */
 final class IsShortArrayOrList
 {
+	
+// TODO: I should probably also have a performance test with a huge array without keys....
+
 	const SHORT_ARRAY     = 'short array';
 	const SHORT_LIST      = 'short list';
 	const SQUARE_BRACKETS = 'square brackets';
