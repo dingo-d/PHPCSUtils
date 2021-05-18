@@ -14,6 +14,7 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
+use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\Tokens\Collections;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\FunctionDeclarations;
@@ -21,8 +22,6 @@ use PHPCSUtils\Utils\Lists;
 
 /**
  * Determination of short array vs short list vs square brackets.
- *
- * Uses caching of previous results to mitigate performance issues.
  *
  * This class is only intended for internal use by PHPCSUtils and is not part of the public API.
  * This also means that it has no promise of backward compatibility.
@@ -44,91 +43,7 @@ final class IsShortArrayOrList
 	const SQUARE_BRACKETS = 'square brackets';
 
 	/**
-	 * Instance of this class.
-	 *
-	 * @var PHPCSUtils\Internal\IsShortArrayOrList
-	 */
-	private static $instance;
-
-	/**
-	 * Cache of seen tokens by file.
-	 *
-	 * The array format of the cache is:
-	 * ```
-	 * [
-	 *   'filename' => [
-	 *     $opener => [
-	 *       'opener' => $opener,
-	 *       'closer' => $closer,
-	 *       'type'   => 'short array'|'short list'|'square brackets',
-	 *     ]
-	 *   ]
-	 * ]
-	 * ```
-	 *
-	 * @var array
-	 */
-	private $seen;
-
-	/**
-	 * Default values for a cache entry.
-	 *
-	 * @var array
-	 */
-	private $cacheDefaults = [
-		'opener' => null,
-		'closer' => null,
-		'type'   => '',
-	];
-
-	/**
-	 * PHPCS version used during the run.
-	 *
-	 * @var string
-	 */
-	private $phpcsVersion;
-
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsGte330;
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsGte280;
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsLt360;
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsLt356;
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsLt290;
-	/**
-	 * TODO
-	 *
-	 * @var bool
-	 */
-	private $phpcsLt280;
-
-	/**
 	 * The PHPCS file in which the current stackPtr was found.
-	 *
-	 * Temporary value. This property will be reset after each request to this class.
 	 *
 	 * @var \PHP_CodeSniffer\Files\File
 	 */
@@ -137,16 +52,19 @@ final class IsShortArrayOrList
 	/**
 	 * The current stackPtr.
 	 *
-	 * Temporary value. This property will be reset after each request to this class.
-	 *
 	 * @var int
 	 */
 	private $stackPtr;
 
 	/**
-	 * The token stack from the current file.
+	 * The currently available cache for the current file.
 	 *
-	 * Temporary value. This property will be reset after each request to this class.
+	 * @var int
+	 */
+	private $cache;
+
+	/**
+	 * The token stack from the current file.
 	 *
 	 * @var array
 	 */
@@ -155,16 +73,12 @@ final class IsShortArrayOrList
 	/**
 	 * The current open bracket.
 	 *
-	 * Temporary value. This property will be reset after each request to this class.
-	 *
 	 * @var int
 	 */
 	private $opener;
 
 	/**
 	 * The current close bracket.
-	 *
-	 * Temporary value. This property will be reset after each request to this class.
 	 *
 	 * @var int
 	 */
@@ -185,84 +99,43 @@ final class IsShortArrayOrList
 	];
 */
 
-    /**
-     * Determine whether a T_OPEN/CLOSE_SHORT_ARRAY token is a short array construct
-     * and not a short list.
-     *
-     * This method also accepts `T_OPEN/CLOSE_SQUARE_BRACKET` tokens to allow it to be
-     * PHPCS cross-version compatible as the short array tokenizing has been plagued by
-     * a number of bugs over time.
-     *
-     * @since 1.0.0
-     *
-     * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
-     * @param int                         $stackPtr  The position of the short array bracket token.
-     *
-     * @return bool `TRUE` if the token passed is the open/close bracket of a short array.
-     *              `FALSE` if the token is a short list bracket, a plain square bracket
-     *              or not one of the accepted tokens.
-     */
-	public static function isShortArray(File $phpcsFile, $stackPtr)
-	{
-		$instance = self::getInstance();
-		return ($instance->process($phpcsFile, $stackPtr) === self::SHORT_ARRAY);
-	}
-
-    /**
-     * Determine whether a T_OPEN/CLOSE_SHORT_ARRAY token is a short list() construct.
-     *
-     * This method also accepts `T_OPEN/CLOSE_SQUARE_BRACKET` tokens to allow it to be
-     * PHPCS cross-version compatible as the short array tokenizing has been plagued by
-     * a number of bugs over time, which affects the short list determination.
-     *
-     * @since 1.0.0
-     *
-     * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
-     * @param int                         $stackPtr  The position of the short array bracket token.
-     *
-     * @return bool `TRUE` if the token passed is the open/close bracket of a short list.
-     *              `FALSE` if the token is a short array bracket or plain square bracket
-     *              or not one of the accepted tokens.
-     */
-	public static function isShortList(File $phpcsFile, $stackPtr)
-	{
-		$instance = self::getInstance();
-		return ($instance->process($phpcsFile, $stackPtr) === self::SHORT_LIST);
-	}
-
-	/**
-	 * Get the singleton instance of this class.
-	 *
-	 * @return self
-	 */
-	protected static function getInstance()
-	{
-		if ((self::$instance instanceof self) === false) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
-
-
 	/**
 	 * Constructor.
 	 *
-	 * Sets up some basic properties to be available throughout the PHPCS run.
+	 * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
+	 * @param int						  $stackPtr  The position of the short array bracket token.
+	 * @param array                       $cache     The currently available cache for the current file.
 	 *
 	 * @return void
 	 */
-	private function __construct()
+	public function __construct(File $phpcsFile, $stackPtr, $cache)
 	{
-		$this->phpcsVersion = Helper::getVersion();
-		$this->phpcsGte330	= \version_compare($this->phpcsVersion, '3.3.0', '>=');
-		$this->phpcsGte280	= \version_compare($this->phpcsVersion, '2.8.0', '>=');
-		$this->phpcsLt360	= \version_compare($this->phpcsVersion, '3.6.0', '<');
-		$this->phpcsLt356	= \version_compare($this->phpcsVersion, '3.5.6', '<');
-		$this->phpcsLt290	= \version_compare($this->phpcsVersion, '2.9.0', '<');
-		$this->phpcsLt280	= \version_compare($this->phpcsVersion, '2.8.0', '<');
-	}
+		$tokens = $phpcsFile->getTokens();
+		if (isset($tokens[$stackPtr]) === false
+			|| isset(Collections::$shortArrayTokensBC[$tokens[$stackPtr]['code']]) === false
+		) {
+			throw new RuntimeException('Non-array bracket stackpointer passed');
+		}
 
+		$this->phpcsFile = $phpcsFile;
+		$this->stackPtr  = $stackPtr;
+		$this->cache     = $cache;
+		$this->tokens	 = $tokens;
+
+		$this->opener = $stackPtr;
+		if (isset($this->tokens[$stackPtr]['bracket_opener'])
+			&& $stackPtr !== $this->tokens[$stackPtr]['bracket_opener']
+		) {
+			$this->opener = $this->tokens[$stackPtr]['bracket_opener'];
+		}
+
+		$this->closer = $stackPtr;
+		if (isset($this->tokens[$stackPtr]['bracket_closer'])
+			&& $stackPtr !== $this->tokens[$stackPtr]['bracket_closer']
+		) {
+			$this->closer = $this->tokens[$stackPtr]['bracket_closer'];
+		}
+	}
 
 	/**
 	 *
@@ -275,161 +148,21 @@ final class IsShortArrayOrList
 	 *                      Either 'short array', 'short list' or 'square brackets'.
 	 *                      Or FALSE is this was not a bracket token.
 	 */
-	protected function process(File $phpcsFile, $stackPtr)
+	public function process()
 	{
-		if ($this->isValidStackPtr($phpcsFile, $stackPtr) === false) {
-			return false;
-		}
-
-		// Set some properties for this solver run only.
-		$this->setTempProps($phpcsFile, $stackPtr);
-
 		if ($this->opener === $this->closer) {
 			// Parse error (unclosed bracket) or live coding. Bow out.
-			$this->resetTempProps();
 			return self::SQUARE_BRACKETS;
 		}
 
-		/*
-		 * Check the cache in case we've seen this token before.
-		 * The cache _may_ return an empty string.
-		 */
-		$type = $this->checkCache();
-		if ($type !== false) {
-			$this->resetTempProps();
-			return $type;
-		}
-
-
-		$type = $this->solve();
-
-		$this->updateCache($type);
-		
-		// Reset the temporary properties.
-		$this->resetTempProps();
-
-		return $type;
+		return $this->solve();
 	}
-
-	/**
-	 * Verify the passed token could potentially be a short array or short list token.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
-	 * @param int						  $stackPtr  The position of the short array bracket token.
-	 *
-	 * @return bool
-	 */
-	protected function isValidStackPtr(File $phpcsFile, $stackPtr)
-	{
-		$tokens = $phpcsFile->getTokens();
-		if (isset($tokens[$stackPtr]) === false
-			|| isset(Collections::$shortArrayTokensBC[$tokens[$stackPtr]['code']]) === false
-		) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Set some properties for this solver run only.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
-	 * @param int						  $stackPtr  The position of the short array bracket token.
-	 *
-	 * @return void
-	 */
-	protected function setTempProps(File $phpcsFile, $stackPtr)
-	{
-		$this->phpcsFile = $phpcsFile;
-		$this->stackPtr  = $stackPtr;
-		$this->tokens	 = $phpcsFile->getTokens();
-
-		$this->opener = $this->stackPtr;
-		if (isset($this->tokens[$this->stackPtr]['bracket_opener'])
-			&& $this->stackPtr !== $this->tokens[$this->stackPtr]['bracket_opener']
-		) {
-			$this->opener = $this->tokens[$this->stackPtr]['bracket_opener'];
-		}
-
-		$this->closer = $this->stackPtr;
-		if (isset($this->tokens[$this->stackPtr]['bracket_closer'])
-			&& $this->stackPtr !== $this->tokens[$this->stackPtr]['bracket_closer']
-		) {
-			$this->closer = $this->tokens[$this->stackPtr]['bracket_closer'];
-		}
-	}
-
-	/**
-	 * Reset the temporary properties which were set for this solver run only.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return void
-	 */
-	protected function resetTempProps()
-	{
-		unset($this->phpcsFile, $this->stackPtr, $this->tokens, $this->opener, $this->closer);
-	}
-
-	/**
-	 * TODO
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return string|false The previously determined type (which could be an empty string)
-	 *                      or FALSE if no cache entry was found for this token.
-	 */
-	protected function checkCache()
-	{
-		$fileName = $this->phpcsFile->getFilename();
-		if (isset($this->seen[$fileName][$this->opener]) === true) {
-			return $this->seen[$fileName][$this->opener]['type'];
-		}
-		
-		return false;
-	}
-
-	/**
-	 * TODO
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param string $type Optional. The type this bracket has been determined to be.
-	 *                     Either 'short_array' or 'short_list'.
-	 *                     Defaults to an empty string which means "neither",
-	 *                     i.e. plain square brackets.
-	 *
-	 * @return void
-	 */
-	protected function updateCache($type = '')
-	{
-		$entry           = $this->cacheDefaults;
-		$entry['opener'] = $this->opener;
-		$entry['closer'] = $this->closer;
-
-		if ($type === self::SHORT_ARRAY
-			|| $type === self::SHORT_LIST
-			|| $type === self::SQUARE_BRACKETS
-		) {
-			$entry['type'] = $type;
-		}
-
-		$fileName = $this->phpcsFile->getFilename();
-
-		$this->seen[$fileName][$this->opener] = $entry;
-	}
-
 
 	/**
 	 *
 	 * @return string Either 'short array', 'short list' or 'square brackets'.
 	 */
-	public function solve()
+	protected function solve()
 	{
 		// Check if this is a bracket we need to examine.
 		if ($this->isShortArrayBracket() === false) {
@@ -525,8 +258,12 @@ Probably not needed.
 			|| $this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SQUARE_BRACKET
 		) {
 // Should this be short list or short array ?
-   // Be aware: the temporary properties will be reset because of this!
-			return $this->process($this->phpcsFile, $nextAfterCloser);
+
+// Beware: doing it this way, the results of the "outer" array will not be added to the cache....
+//			$instance = new self($this->phpcsFile, $nextAfterCloser, $this->cache);
+//			return $instance->process();
+
+			return IsShortArrayOrListWithCache::getType($this->phpcsFile, $nextAfterCloser);
 		}
 
 		if ($this->tokens[$nextAfterCloser]['code'] !== \T_COMMA) {
@@ -554,13 +291,14 @@ Probably not needed.
 	 */
 	protected function isShortArrayBracket()
 	{
+		$phpcsVersion = Helper::getVersion();
 		$prevNonEmpty = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, ($this->opener - 1), null, true);
 
         /*
          * Deal with square brackets which may be incorrectly tokenized short arrays.
          */
 		if ($this->tokens[$this->opener]['code'] === \T_OPEN_SQUARE_BRACKET) {
-			if ($this->phpcsGte330 === true) {
+			if (\version_compare($phpcsVersion, '3.3.0', '>=') === true) {
 				// These will just be properly tokenized, plain square brackets. No need for further checks.
 				return false;
 			}
@@ -573,7 +311,7 @@ Probably not needed.
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1971
 			 */
 // TODO: examine if this bug also exists with T_OPEN_TAG_WITH_ECHO (probably yes)
-			if ($this->phpcsGte280 === true
+			if (\version_compare($phpcsVersion, '2.8.0', '>=')
 			    && $prevNonEmpty === 0
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_OPEN_TAG
 			) {
@@ -587,7 +325,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
 			 */
-			if ($this->phpcsLt280 === true
+			if (\version_compare($phpcsVersion, '2.8.0', '<')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
 				&& isset($this->tokens[$prevNonEmpty]['scope_condition']) === true
 			) {
@@ -612,7 +350,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3172
 			 */
-			if ($this->phpcsLt360 === true
+			if (\version_compare($phpcsVersion, '3.6.0', '<')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_DOUBLE_QUOTED_STRING
 			) {
 				return false;
@@ -625,7 +363,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3013
 			 */
-			if ($this->phpcsLt356 === true
+			if (\version_compare($phpcsVersion, '3.5.6', '<')
 				&& isset(Collections::$magicConstants[$this->tokens[$prevNonEmpty]['code']]) === true
 			) {
 				return false;
@@ -638,7 +376,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1381
 			 */
-			if ($this->phpcsLt290 === true
+			if (\version_compare($phpcsVersion, '2.9.0', '<')
 			    && ($this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_SHORT_ARRAY
 					|| $this->tokens[$prevNonEmpty]['code'] === \T_CONSTANT_ENCAPSED_STRING)
 			) {
@@ -651,7 +389,8 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
 			 */
-			if ($this->phpcsLt290 === true && $this->phpcsGte280 === true
+			if (\version_compare($phpcsVersion, '2.9.0', '<')
+				&& \version_compare($phpcsVersion, '2.8.0', '>=')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
 			) {
 				$openCurly	   = $this->tokens[$prevNonEmpty]['bracket_opener'];
@@ -683,13 +422,12 @@ Probably not needed.
 	 */
 	protected function checkCacheForOuterBrackets($prevBeforeOpener, $nextAfterCloser)
 	{
-		$fileName = $this->phpcsFile->getFilename();
-		if (isset($this->seen[$fileName]) === false) {
+		if (empty($this->cache) === false) {
 			return false;
 		}
 		
-		// Reverse the array as we want to find the deepest entry in which these brackets are nested.
-		$seenBrackets = $this->seen[$fileName];
+		// Reverse sort the cache as we want to find the deepest entry in which these brackets are nested.
+		$seenBrackets = $this->cache;
 		krsort($seenBrackets, SORT_NUMERIC);
 
 		foreach ($seenBrackets as $opener => $bracketInfo) {

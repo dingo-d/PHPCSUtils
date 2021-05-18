@@ -14,7 +14,7 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
-use PHPCSUtils\Internal\IsShortArrayOrList;
+use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\Tokens\Collections;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\GetTokensAsString;
@@ -67,7 +67,7 @@ class Lists
      */
     public static function isShortList(File $phpcsFile, $stackPtr)
     {
-		return IsShortArrayOrList::isShortList($phpcsFile, $stackPtr);
+		return IsShortArrayOrListWithCache::isShortList($phpcsFile, $stackPtr);
 
 
 		static $lastSeenList = [

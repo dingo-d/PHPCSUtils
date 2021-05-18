@@ -14,7 +14,7 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
-use PHPCSUtils\Internal\IsShortArrayOrList;
+use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\Tokens\Collections;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\FunctionDeclarations;
@@ -64,7 +64,7 @@ class Arrays
      */
     public static function isShortArray(File $phpcsFile, $stackPtr)
     {
-		return IsShortArrayOrList::isShortArray($phpcsFile, $stackPtr);
+		return IsShortArrayOrListWithCache::isShortArray($phpcsFile, $stackPtr);
 
 
 		/*
