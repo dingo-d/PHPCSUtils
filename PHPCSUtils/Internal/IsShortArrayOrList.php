@@ -175,6 +175,7 @@ final class IsShortArrayOrList
 	 *
 	 * @var array
 	 */
+/*
 	private $arrayOperators = [
 		T_PLUS             => T_PLUS,
 		T_IS_EQUAL         => T_IS_EQUAL,
@@ -182,6 +183,7 @@ final class IsShortArrayOrList
 		T_IS_NOT_EQUAL     => T_IS_NOT_EQUAL,
 		T_IS_NOT_IDENTICAL => T_IS_NOT_IDENTICAL,
 	];
+*/
 
     /**
      * Determine whether a T_OPEN/CLOSE_SHORT_ARRAY token is a short array construct
@@ -451,7 +453,8 @@ final class IsShortArrayOrList
 		if ($this->tokens[$nextAfterCloser]['code'] === \T_EQUAL) {
 			return self::SHORT_LIST;
 		}
-
+/*
+Probably not needed.
 		// If the array closer is followed by a real square bracket (dereferenced), it's always a short array.
 		if ($this->tokens[$nextAfterCloser]['code'] === \T_OPEN_SQUARE_BRACKET) {
 			return self::SHORT_ARRAY;
@@ -466,13 +469,7 @@ final class IsShortArrayOrList
 		if (isset($this->arrayOperators[$this->tokens[$nextAfterCloser]['code']]) === true) {
 			return self::SHORT_ARRAY;
 		}
-
-		// If the array opener is preceded by an equals sign, and we already know it isn't followed
-		// by one (check above), it's always a short array.
-		if ($this->tokens[$prevBeforeOpener]['code'] === \T_EQUAL) {
-			return self::SHORT_ARRAY;
-		}
-
+*/
 
 		/* If the array closer is followed by a double arrow, it's always a short list.
 // Needs tests for match expressions as I'm pretty sure it will bork on those.
@@ -498,6 +495,9 @@ final class IsShortArrayOrList
 					break;
 
 				case 'afterAs':
+// Do we need this extra check ? And is it correct ?
+// `as $key` can never be an array as the original array can never have a key in array format.
+// So the only one we'd want to exclude would be nested ones which could still be both
 					if ($this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_PARENTHESIS) {
 						return self::SHORT_LIST;
 					}
@@ -516,6 +516,30 @@ final class IsShortArrayOrList
 */
 		}
 
+		/*
+		 * If the array closer is not followed by an equals sign, list closing bracket or a comma
+		 * and is not in a foreach condition, we know for sure it is a short array and not a short list.
+		 * The comma is the most problematic one as that can mean a nested short array or nested short list.
+		 */
+		if ($this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SHORT_ARRAY
+			|| $this->tokens[$nextAfterCloser]['code'] === \T_CLOSE_SQUARE_BRACKET
+		) {
+// Should this be short list or short array ?
+   // Be aware: the temporary properties will be reset because of this!
+			return $this->process($this->phpcsFile, $nextAfterCloser);
+		}
+
+		if ($this->tokens[$nextAfterCloser]['code'] !== \T_COMMA) {
+			// Definitely short array.
+			return self::SHORT_ARRAY;
+		}
+
+		// If the array opener is preceded by an equals sign, and we already know it isn't followed
+		// by one (check above), it's always a short array.
+// Can't imagine this condition ever getting hit.
+		if ($this->tokens[$prevBeforeOpener]['code'] === \T_EQUAL) {
+			return self::SHORT_ARRAY;
+		}
 
 	}
 
@@ -665,11 +689,12 @@ final class IsShortArrayOrList
 		}
 		
 		// Reverse the array as we want to find the deepest entry in which these brackets are nested.
-		$seenBrackets = array_reverse($this->seen[$fileName]);
+		$seenBrackets = $this->seen[$fileName];
+		krsort($seenBrackets, SORT_NUMERIC);
 
 		foreach ($seenBrackets as $opener => $bracketInfo) {
 			if ($bracketInfo['opener'] < $this->opener && $bracketInfo['closer'] > $this->closer) {
-				// Catch just one typical case as we're walking the seen brackets cache anyway.
+				// Catch just one typical array ase as we're walking the seen brackets cache anyway.
 				if ($bracketInfo['type'] === self::SHORT_ARRAY
 					&& $bracketInfo['closer'] === $nextAfterCloser
 				) {
