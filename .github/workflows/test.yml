@@ -177,7 +177,7 @@ jobs:
 
       - name: Run the unit tests (non-risky)
         if: matrix.risky == false
-        run: vendor/bin/phpunit --no-coverage
+        run: vendor/bin/phpunit --no-coverage --enforce-time-limit
 
       - name: Run the unit tests (risky)
         if: ${{ matrix.risky }}
