@@ -16,9 +16,11 @@ use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
 use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\Tokens\Collections;
+use PHPCSUtils\Utils\Arrays;
 use PHPCSUtils\Utils\Context;
 use PHPCSUtils\Utils\FunctionDeclarations;
 use PHPCSUtils\Utils\Lists;
+use PHPCSUtils\Utils\PassedParameters;
 
 /**
  * Determination of short array vs short list vs square brackets.
@@ -38,9 +40,33 @@ final class IsShortArrayOrList
 	
 // TODO: I should probably also have a performance test with a huge array without keys....
 
-	const SHORT_ARRAY     = 'short array';
-	const SHORT_LIST      = 'short list';
+    /**
+     * Type annotation for short arrays.
+     *
+     * @var string
+     */
+	const SHORT_ARRAY = 'short array';
+
+    /**
+     * Type annotation for short lists.
+     *
+     * @var string
+     */
+	const SHORT_LIST = 'short list';
+
+    /**
+     * Type annotation for square brackets.
+     *
+     * @var string
+     */
 	const SQUARE_BRACKETS = 'square brackets';
+	
+	/**
+	 * Limit for retrieving the items within an array/list.
+	 *
+	 * @var int
+	 */
+	const ITEM_LIMIT = 5;
 
 	/**
 	 * The PHPCS file in which the current stackPtr was found.
@@ -531,14 +557,74 @@ $array = [
 	/**
 	 * Walk the first part of the contents of the brackets to see if we can determine if this is an array or short list.
 	 *
-	 * This won't walk the complete contents as that could be a huge performance drain. Just the first x tokens.
+	 * This won't walk the complete contents as that could be a huge performance drain. Just the first x items.
 	 *
 	 * @return string|false The determined type or FALSE if undetermined.
 	 */
 	protected function walkInside()
 	{
-		$count = 0;
-		
+		$items = PassedParameters::getParameters($this->phpcsFile, $this->opener, self::ITEM_LIMIT, true);
+
+		/*
+		 * Check if this could be a (nested) short list at all.
+		 * A list must have at least one variable inside and can not be empty.
+		 * /
+		$nonEmptyInside = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($this->opener + 1), $this->closer, true);
+		if ($nonEmptyInside === false) {
+			// This is an empty array.
+			return self::SHORT_ARRAY;
+		} elseif ($this->tokens[$nonEmptyInside]['code'] === \T_COMMA) {
+			// An array can not start with an empty entry, a list can.
+			return self::SHORT_LIST;
+		}
+		*/
+
+		/*
+		 * A list must have at least one variable inside and can not be empty, so this must be an array.
+		 */
+		if (empty($items) === true) {
+			return self::SHORT_ARRAY;
+		}
+
+		foreach ($items as $item) {
+			// TODO: check how an empty list item (only comma, no whitespace around it) presents....
+			// If we find an empty list item, it is definitely a short list.
+
+			$arrow = Arrays::getDoubleArrowPtr($this->phpcsFile, $item['start'], $item['end']);
+			if ($arrow === false) {
+				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, $item['start'], ($item['end'] + 1), true);
+			} else {
+				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($arrow + 1), ($item['end'] + 1), true);
+			}
+			
+			/*
+			 * If the "value" part of the entry doesn't start with a variable or a (nested) short list/array,
+			 * we know for sure that it will be an array.
+			 * Same, if the "value" part starts with an open bracket, but has other tokens after it.
+			 */
+			if ($this->tokens[$firstNonEmptyInValue]['code'] !== \T_VARIABLE
+				&& isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === false
+			) {
+				return self::SHORT_ARRAY;
+			}
+
+			$lastNonEmptyInValue = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, $item['end'], ($arrow + 1), true);
+			if (isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === true
+				&& isset($this->tokens[$firstNonEmptyInValue]['bracket_closer']) === true
+				&& $this->tokens[$firstNonEmptyInValue]['bracket_closer'] !== $lastNonEmptyInValue
+			) {
+				return self::SHORT_ARRAY;
+			}
+			
+			if ($arrow === false) {
+				continue;
+			}
+		}
+
+		// Undetermined.
+		return false;
+
+
 		/*
 		if entry starts with [:
 
