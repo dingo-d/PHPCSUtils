@@ -5,6 +5,7 @@
     backupGlobals="true"
     bootstrap="./Tests/bootstrap.php"
     beStrictAboutTestsThatDoNotTestAnything="true"
+    failOnRisky="true"
     colors="true"
     forceCoversAnnotation="true">
 
