@@ -307,20 +307,11 @@ Probably not needed.
 			return self::SHORT_ARRAY;
 		}
 
-// From arrays:
 		/*
 		 * Check if this could be a (nested) short list at all.
 		 * A list must have at least one variable inside and can not be empty.
+		 * An array, however, cannot contain empty items, so let's have a closer look.
 		 */
-		$nonEmptyInside = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($this->opener + 1), $this->closer, true);
-		if ($nonEmptyInside === false) {
-			// This is an empty array.
-			return self::SHORT_ARRAY;
-		} elseif ($this->tokens[$nonEmptyInside]['code'] === \T_COMMA) {
-			// An array can not start with an empty entry, a list can.
-			return self::SHORT_LIST;
-		}
-		
 		$type = $this->walkInside();
 		if ($type !== false) {
 			return $type;
@@ -549,7 +540,7 @@ $array = [
 
 
 	/**
-	 * Walk the first part of the contents of the brackets to see if we can determine if this is an array or short list.
+	 * Walk the first part of the contents between the brackets to see if we can determine if this is an array or short list.
 	 *
 	 * This won't walk the complete contents as that could be a huge performance drain. Just the first x items.
      *
@@ -559,33 +550,34 @@ $array = [
 	 */
 	protected function walkInside()
 	{
+		// Get the first 5 "parameters" and ignore the "is short array" check.
 		$items = PassedParameters::getParameters($this->phpcsFile, $this->opener, self::ITEM_LIMIT, true);
 
-		/*
-		 * A list can not be empty, so this must be an array.
-		 */
 		if ($items === []) {
+		    // A list can not be empty, so this must be an array.
 			return self::SHORT_ARRAY;
 		}
 
-		/*
-		 * A list must have at least one variable inside and can not be empty, so this must be an array.
-		 */
 		foreach ($items as $item) {
-			// TODO: check how an empty list item (only comma, no whitespace around it) presents....
-			// If we find an empty list item, it is definitely a short list.
+			/*
+			 * If we encounter a completely empty item, this must be a short list as arrays cannot contain
+			 * empty items.
+			 */
+			if ($item['raw'] === '') {
+				return self::SHORT_LIST;
+			}
 
+			/*
+			 * If the "value" part of the entry doesn't start with a variable or a (nested) short list/array,
+			 * we know for sure that it will be an array.
+			 */
 			$arrow = Arrays::getDoubleArrowPtr($this->phpcsFile, $item['start'], $item['end']);
 			if ($arrow === false) {
 				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, $item['start'], ($item['end'] + 1), true);
 			} else {
 				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($arrow + 1), ($item['end'] + 1), true);
 			}
-			
-			/*
-			 * If the "value" part of the entry doesn't start with a variable or a (nested) short list/array,
-			 * we know for sure that it will be an array.
-			 */
+
 			if ($this->tokens[$firstNonEmptyInValue]['code'] !== \T_VARIABLE
 				&& isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === false
 			) {
@@ -593,7 +585,8 @@ $array = [
 			}
 
 			/*
-			 * If the "value" part starts with an open bracket, but has other tokens after it, it will also be an array.
+			 * If the "value" part starts with an open bracket, but has other tokens after it, it will also
+			 * always be an array.
 			 */
 			$lastNonEmptyInValue = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, $item['end'], ($arrow + 1), true);
 			if (isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === true
@@ -603,11 +596,13 @@ $array = [
 				return self::SHORT_ARRAY;
 			}
 
+			/*
 			if ($arrow === false) {
 				continue;
 			}
 
 			// Maybe examine key ?? if array it must be short list
+			*/
 		}
 
 		// Undetermined.
@@ -619,10 +614,6 @@ If close bracket is followed by a =>, it will always be a short list (providing 
 as arrays can't have array keys.
 */
 
-/*
-If even one entry has a => followed by anything but a variable or open bracket, it will be a short array as lists can only have variables
-or nested lists as the value.
-*/
 
 	/**
 	 * Determine whether a T_OPEN/CLOSE_SHORT_ARRAY token is a short array construct
