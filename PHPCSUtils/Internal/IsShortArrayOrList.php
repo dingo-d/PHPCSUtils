@@ -359,10 +359,9 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1971
 			 */
-// TODO: examine if this bug also exists with T_OPEN_TAG_WITH_ECHO (probably yes)
 			if (\version_compare($phpcsVersion, '2.8.0', '>=')
 			    && $prevNonEmpty === 0
-				&& $this->tokens[$prevNonEmpty]['code'] === \T_OPEN_TAG
+				&& isset(Collections::phpOpenTags()[$this->tokens[$prevNonEmpty]['code']]) === true
 			) {
 				return true;
 			}
