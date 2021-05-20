@@ -127,6 +127,15 @@ final class IsShortArrayOrList
 	 * @var int
 	 */
 	private $closer;
+	
+	/**
+	 * Current PHPCS version being used.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @var string
+	 */
+	private $phpcsVersion;
 
 	/**
 	 * Constructor.
@@ -139,7 +148,7 @@ final class IsShortArrayOrList
 	 *
 	 * @return void
 	 */
-	public function __construct(File $phpcsFile, $stackPtr, $cache)
+	public function __construct(File $phpcsFile, $stackPtr, $cache = [])
 	{
 		$tokens = $phpcsFile->getTokens();
 		if (isset($tokens[$stackPtr]) === false
@@ -166,6 +175,8 @@ final class IsShortArrayOrList
 		) {
 			$this->closer = $this->tokens[$stackPtr]['bracket_closer'];
 		}
+		
+		$this->phpcsVersion = Helper::getVersion();
 	}
 
 	/**
@@ -316,6 +327,13 @@ Probably not needed.
 		if ($type !== false) {
 			return $type;
 		}
+		
+		$type = $this->walkOutside();
+		if ($type !== false) {
+			return $type;
+		}
+
+
 /*
 		// In all other circumstances, make sure this isn't a (nested) short list instead of a short array.
 		if (Lists::isShortList($this->phpcsFile, $stackPtr) === false) {
@@ -340,14 +358,13 @@ Probably not needed.
 	 */
 	protected function isShortArrayBracket()
 	{
-		$phpcsVersion = Helper::getVersion();
 		$prevNonEmpty = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, ($this->opener - 1), null, true);
 
         /*
          * Deal with square brackets which may be incorrectly tokenized short arrays.
          */
 		if ($this->tokens[$this->opener]['code'] === \T_OPEN_SQUARE_BRACKET) {
-			if (\version_compare($phpcsVersion, '3.3.0', '>=') === true) {
+			if (\version_compare($this->phpcsVersion, '3.3.0', '>=') === true) {
 				// These will just be properly tokenized, plain square brackets. No need for further checks.
 				return false;
 			}
@@ -359,7 +376,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1971
 			 */
-			if (\version_compare($phpcsVersion, '2.8.0', '>=')
+			if (\version_compare($this->phpcsVersion, '2.8.0', '>=')
 			    && $prevNonEmpty === 0
 				&& isset(Collections::phpOpenTags()[$this->tokens[$prevNonEmpty]['code']]) === true
 			) {
@@ -373,7 +390,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
 			 */
-			if (\version_compare($phpcsVersion, '2.8.0', '<')
+			if (\version_compare($this->phpcsVersion, '2.8.0', '<')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
 				&& isset($this->tokens[$prevNonEmpty]['scope_condition']) === true
 			) {
@@ -398,7 +415,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3172
 			 */
-			if (\version_compare($phpcsVersion, '3.6.0', '<')
+			if (\version_compare($this->phpcsVersion, '3.6.0', '<')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_DOUBLE_QUOTED_STRING
 			) {
 				return false;
@@ -411,7 +428,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3013
 			 */
-			if (\version_compare($phpcsVersion, '3.5.6', '<')
+			if (\version_compare($this->phpcsVersion, '3.5.6', '<')
 				&& isset(Collections::$magicConstants[$this->tokens[$prevNonEmpty]['code']]) === true
 			) {
 				return false;
@@ -424,7 +441,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1381
 			 */
-			if (\version_compare($phpcsVersion, '2.9.0', '<')
+			if (\version_compare($this->phpcsVersion, '2.9.0', '<')
 			    && ($this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_SHORT_ARRAY
 					|| $this->tokens[$prevNonEmpty]['code'] === \T_CONSTANT_ENCAPSED_STRING)
 			) {
@@ -437,7 +454,7 @@ Probably not needed.
 			 *
 			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
 			 */
-			if (\version_compare($phpcsVersion, '2.9.0', '<')
+			if (\version_compare($this->phpcsVersion, '2.9.0', '<')
 				&& \version_compare($phpcsVersion, '2.8.0', '>=')
 				&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
 			) {
@@ -557,6 +574,10 @@ $array = [
 			return self::SHORT_ARRAY;
 		}
 
+		// Make sure list vars assigned by reference are handled correctly.
+		$skip   = Tokens::$emptyTokens;
+		$skip[] = T_BITWISE_AND;
+
 		foreach ($items as $item) {
 			/*
 			 * If we encounter a completely empty item, this must be a short list as arrays cannot contain
@@ -572,11 +593,11 @@ $array = [
 			 */
 			$arrow = Arrays::getDoubleArrowPtr($this->phpcsFile, $item['start'], $item['end']);
 			if ($arrow === false) {
-				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, $item['start'], ($item['end'] + 1), true);
+				$firstNonEmptyInValue = $this->phpcsFile->findNext($skip, $item['start'], ($item['end'] + 1), true);
 			} else {
-				$firstNonEmptyInValue = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($arrow + 1), ($item['end'] + 1), true);
+				$firstNonEmptyInValue = $this->phpcsFile->findNext($skip, ($arrow + 1), ($item['end'] + 1), true);
 			}
-
+			
 			if ($this->tokens[$firstNonEmptyInValue]['code'] !== \T_VARIABLE
 				&& isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === false
 			) {
@@ -606,6 +627,156 @@ $array = [
 
 		// Undetermined.
 		return false;
+	}
+	
+	/**
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|false The determined type or FALSE if undetermined.
+	 */
+	protected function walkOutside()
+	{
+/*
+ TODO: maybe remember previous "false" and if opener < current opener + closer > current closer, limit token walking to
+ within that.
+
+ Also: if closer - current closer < current opener - opener, walk forward instead of backward
+*/
+
+		for ($i = ($this->opener - 1); $i >= 0; $i--) {
+			// Skip over block comments (just in case).
+			if ($this->tokens[$i]['code'] === \T_DOC_COMMENT_CLOSE_TAG) {
+				$i = $this->tokens[$i]['comment_opener'];
+				continue;
+			}
+
+			if (isset(Tokens::$emptyTokens[$this->tokens[$i]['code']]) === true) {
+				continue;
+			}
+
+			// Stop on an end of statement.
+			if ($this->tokens[$i]['code'] === \T_SEMICOLON) {
+				// End of previous statement.
+//echo 'false: reached end of previous statement', PHP_EOL;
+				return self::SHORT_ARRAY;
+			}
+			
+			// Can we also stop on open curly with close curly after ?
+			// And on open parenthesis with closer after ?
+			// And on PHP open tags
+			// Maybe colon ? inline else ? probably also null coalesce -> check findStartOfStatement list
+// HELL YES! Need to stop as soon as possible.
+// Even more important now with match in the picture.
+// Maybe also check $condition and $nested_parenthesis for being the same
+
+			// Skip over all (close) braces
+			if (isset($this->tokens[$i]['scope_opener']) === true) {
+				if ($i === $this->tokens[$i]['scope_opener']
+					&& $this->tokens[$i]['scope_closer'] > $this->closer
+				) {
+					// Found a scope wrapping this set of brackets before finding a outer set of brackets.
+					// This will be a short array.
+					return self::SHORT_ARRAY;
+				}
+
+				if ($i === $this->tokens[$i]['scope_closer']) {
+					if (isset($this->tokens[$i]['scope_owner']) === true) {
+						$i = $this->tokens[$i]['scope_owner'];
+						continue;
+					}
+
+					$i = $this->tokens[$i]['scope_opener'];
+					continue;
+				}
+			}
+
+			if (isset($this->tokens[$i]['parenthesis_opener']) === true) {
+				if ($i === $this->tokens[$i]['parenthesis_opener']
+					&& $this->tokens[$i]['parenthesis_closer'] > $this->closer
+				) {
+					// Found parentheses wrapping this set of brackets before finding a outer set of brackets.
+					// This will be a short array.
+					return self::SHORT_ARRAY;
+				}
+
+				if ($i === $this->tokens[$i]['parenthesis_closer']) {
+					$i = $this->tokens[$i]['parenthesis_opener'];
+					continue;
+				}
+			}
+
+			// If this is a close bracket, it's not the outer wrapper, so we can ignore it completely.
+			if (isset($this->tokens[$i]['bracket_opener']) === true
+				&& $i === $this->tokens[$i]['bracket_closer']
+			) {
+				$i = $this->tokens[$i]['bracket_opener'];
+				continue;
+			}
+
+			// Open bracket
+			if (isset(Collections::$shortArrayTokensBC[$this->tokens[$i]['code']]) === true
+				&& isset($this->tokens[$i]['bracket_closer']) === true
+				&& $this->tokens[$i]['bracket_closer'] > $this->closer
+			) {
+				// This is one we have to examine further as an outer set of brackets.
+				// As all the other checks have already failed to get a result, we know that
+				// whatever the outer set is, the inner set will be the same.
+				return IsShortArrayOrListWithCache::getType($this->phpcsFile, $i);
+			}
+		}
+		
+		// Reached the start of the file without finding an outer set of brackets.
+		// This MUST be a short array.
+		return self::SHORT_ARRAY;
+
+/*
+
+			$found = (bool) $exclude;
+			foreach ($types as $type) {
+				if ($this->tokens[$i]['code'] === $type) {
+					$found = !$exclude;
+					break;
+				}
+			}
+
+			if ($found === true) {
+				if ($value === null) {
+					return $i;
+				} else if ($this->tokens[$i]['content'] === $value) {
+					return $i;
+				}
+			}
+
+
+/*
+if isset scope_opener + scope closer && i === scope opener && scope closer > "list closer"
+return false
+
+if isset parenthesis_opener + parenthesis_closer && i === parenthesis_opener && parenthesis_closer > "list closer"
+return false
+
+
+
+			if ($local === true) {
+				if (isset($this->tokens[$i]['scope_opener']) === true
+					&& $i === $this->tokens[$i]['scope_closer']
+				) {
+					$i = $this->tokens[$i]['scope_opener'];
+				} else if (isset($this->tokens[$i]['bracket_opener']) === true
+					&& $i === $this->tokens[$i]['bracket_closer']
+				) {
+					$i = $this->tokens[$i]['bracket_opener'];
+				} else if (isset($this->tokens[$i]['parenthesis_opener']) === true
+					&& $i === $this->tokens[$i]['parenthesis_closer']
+				) {
+					$i = $this->tokens[$i]['parenthesis_opener'];
+				} else if ($this->tokens[$i]['code'] === T_SEMICOLON) {
+					break;
+				}
+			}
+		}//end for
+*/
 	}
 
 /*
