@@ -8,11 +8,10 @@
  * @link      https://github.com/PHPCSStandards/PHPCSUtils
  */
 
-namespace PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance;
+namespace PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache;
 
+use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\TestUtils\UtilityMethodTestCase;
-use PHPCSUtils\Utils\Arrays;
-use PHPCSUtils\Utils\Lists;
 
 /**
  * Tests the performance of the "is short array/short list" determination to make sure it doesn't degrade.
@@ -62,7 +61,7 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
         while (($i = self::$phpcsFile->findNext([\T_OPEN_SHORT_ARRAY, \T_OPEN_SQUARE_BRACKET], ($i + 1))) !== false) {
             $this->assertSame(
                 $expect,
-                Arrays::isShortArray(self::$phpcsFile, $i),
+                IsShortArrayOrListWithCache::isShortArray(self::$phpcsFile, $i),
                 'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
             );
             ++$counter;
@@ -86,7 +85,7 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
         while (($i = self::$phpcsFile->findNext([\T_OPEN_SHORT_ARRAY, \T_OPEN_SQUARE_BRACKET], ($i + 1))) !== false) {
             $this->assertSame(
                 $expect,
-                Lists::isShortList(self::$phpcsFile, $i),
+                IsShortArrayOrListWithCache::isShortList(self::$phpcsFile, $i),
                 'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
             );
             ++$counter;

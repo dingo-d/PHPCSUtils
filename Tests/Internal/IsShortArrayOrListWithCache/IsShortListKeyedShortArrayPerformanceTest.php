@@ -8,9 +8,9 @@
  * @link      https://github.com/PHPCSStandards/PHPCSUtils
  */
 
-namespace PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance;
+namespace PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache;
 
-use PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance\AbstractPerformanceTestCase;
+use PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache\AbstractPerformanceTestCase;
 
 /**
  * Tests the performance of the "is short array/short list" determination to make sure it doesn't degrade.

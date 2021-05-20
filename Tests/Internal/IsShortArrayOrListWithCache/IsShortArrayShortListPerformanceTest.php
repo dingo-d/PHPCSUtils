@@ -8,9 +8,9 @@
  * @link      https://github.com/PHPCSStandards/PHPCSUtils
  */
 
-namespace PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance;
+namespace PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache;
 
-use PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance\AbstractPerformanceTestCase;
+use PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache\AbstractPerformanceTestCase;
 
 /**
  * Tests the performance of the "is short array/short list" determination to make sure it doesn't degrade.
@@ -22,7 +22,7 @@ use PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance\AbstractPerforman
  *
  * @since 1.0.0
  */
-class IsShortArrayUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTestCase
+class IsShortArrayShortListPerformanceTest extends AbstractPerformanceTestCase
 {
 
     /**
@@ -30,7 +30,7 @@ class IsShortArrayUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTe
      *
      * @var string
      */
-    const TEST_FILE = 'UnkeyedShortArrayPerformanceTest.inc';
+    const TEST_FILE = 'ShortListPerformanceTest.inc';
 
     /**
      * Test the performance of the Arrays::isShortArray() function without caching.
@@ -42,7 +42,7 @@ class IsShortArrayUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTe
     public function testIsShortArray()
     {
         $start = \microtime(true);
-        $this->examineAllBracketsAsArray(true);
+        $this->examineAllBracketsAsArray(false);
         return (\microtime(true) - $start);
     }
 
@@ -59,7 +59,7 @@ class IsShortArrayUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTe
     public function testEffectOfCaching($time)
     {
         $start = \microtime(true);
-        $this->examineAllBracketsAsArray(true);
+        $this->examineAllBracketsAsArray(false);
         $cachedTime = (\microtime(true) - $start);
 
         if ($time > 0.05) { // 50 microseconds = 0.05 second.

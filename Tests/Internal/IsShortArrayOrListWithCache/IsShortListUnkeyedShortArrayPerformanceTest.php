@@ -8,9 +8,9 @@
  * @link      https://github.com/PHPCSStandards/PHPCSUtils
  */
 
-namespace PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance;
+namespace PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache;
 
-use PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance\AbstractPerformanceTestCase;
+use PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache\AbstractPerformanceTestCase;
 
 /**
  * Tests the performance of the "is short array/short list" determination to make sure it doesn't degrade.
@@ -22,7 +22,7 @@ use PHPCSUtils\Tests\Utils\Lists\IsShortArrayOrListPerformance\AbstractPerforman
  *
  * @since 1.0.0
  */
-class IsShortArrayShortListPerformanceTest extends AbstractPerformanceTestCase
+class IsShortListUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTestCase
 {
 
     /**
@@ -30,27 +30,27 @@ class IsShortArrayShortListPerformanceTest extends AbstractPerformanceTestCase
      *
      * @var string
      */
-    const TEST_FILE = 'ShortListPerformanceTest.inc';
+    const TEST_FILE = 'UnkeyedShortArrayPerformanceTest.inc';
 
     /**
-     * Test the performance of the Arrays::isShortArray() function without caching.
+     * Test the performance of the Lists::isShortList() function without caching.
      *
      * @small
      *
      * @return float
      */
-    public function testIsShortArray()
+    public function testIsShortList()
     {
         $start = \microtime(true);
-        $this->examineAllBracketsAsArray(false);
+        $this->examineAllBracketsAsList(false);
         return (\microtime(true) - $start);
     }
 
     /**
-     * Test the performance of the Arrays::isShortArray() function again now the cache has been warmed up.
+     * Test the performance of the Lists::isShortList() function again now the cache has been warmed up.
      *
      * @small
-     * @depends testIsShortArray
+     * @depends testIsShortList
      *
      * @param float $time Time the first test run examining all arrays took.
      *
@@ -59,7 +59,7 @@ class IsShortArrayShortListPerformanceTest extends AbstractPerformanceTestCase
     public function testEffectOfCaching($time)
     {
         $start = \microtime(true);
-        $this->examineAllBracketsAsArray(false);
+        $this->examineAllBracketsAsList(false);
         $cachedTime = (\microtime(true) - $start);
 
         if ($time > 0.05) { // 50 microseconds = 0.05 second.
@@ -70,7 +70,7 @@ class IsShortArrayShortListPerformanceTest extends AbstractPerformanceTestCase
             $this->assertGreaterThan(
                 15,
                 ($time / $cachedTime),
-                'Short array determination was not significantly faster with a warmed up cache'
+                'Short list determination was not significantly faster with a warmed up cache'
             );
         }
     }
