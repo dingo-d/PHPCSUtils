@@ -33,10 +33,10 @@ use PHPCSUtils\Tokens\Collections;
 final class IsShortArrayOrListWithCache
 {
 
-// TODO: I should probably also have a performance test with a huge array without keys....
-
     /**
      * Instance of this class.
+     *
+     * @since 1.0.0
      *
      * @var \PHPCSUtils\Internal\IsShortArrayOrList
      */
@@ -58,12 +58,16 @@ final class IsShortArrayOrListWithCache
      * ]
      * ```
      *
+     * @since 1.0.0
+     *
      * @var array
      */
     private $seen;
 
     /**
      * Default values for a cache entry.
+     *
+     * @since 1.0.0
      *
      * @var array
      */
@@ -142,6 +146,8 @@ final class IsShortArrayOrListWithCache
     /**
      * Get the singleton instance of this class.
      *
+     * @since 1.0.0
+     *
      * @return self
      */
     protected static function getInstance()
@@ -193,7 +199,7 @@ final class IsShortArrayOrListWithCache
          * If we've not seen the token before, try and solve it and cache the results.
          */
         $solver = new IsShortArrayOrList($phpcsFile, $opener, $this->getCacheForFile($phpcsFile));
-        $type   = $solver->process();
+        $type   = $solver->solve();
 
         $this->updateCache($phpcsFile, $opener, $type);
 

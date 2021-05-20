@@ -38,10 +38,10 @@ use PHPCSUtils\Utils\PassedParameters;
 final class IsShortArrayOrList
 {
 	
-// TODO: I should probably also have a performance test with a huge array without keys....
-
     /**
      * Type annotation for short arrays.
+     *
+     * @since 1.0.0
      *
      * @var string
      */
@@ -50,6 +50,8 @@ final class IsShortArrayOrList
     /**
      * Type annotation for short lists.
      *
+     * @since 1.0.0
+     *
      * @var string
      */
 	const SHORT_LIST = 'short list';
@@ -57,12 +59,16 @@ final class IsShortArrayOrList
     /**
      * Type annotation for square brackets.
      *
+     * @since 1.0.0
+     *
      * @var string
      */
 	const SQUARE_BRACKETS = 'square brackets';
-	
+
 	/**
 	 * Limit for retrieving the items within an array/list.
+     *
+     * @since 1.0.0
 	 *
 	 * @var int
 	 */
@@ -70,6 +76,8 @@ final class IsShortArrayOrList
 
 	/**
 	 * The PHPCS file in which the current stackPtr was found.
+     *
+     * @since 1.0.0
 	 *
 	 * @var \PHP_CodeSniffer\Files\File
 	 */
@@ -77,6 +85,8 @@ final class IsShortArrayOrList
 
 	/**
 	 * The current stackPtr.
+     *
+     * @since 1.0.0
 	 *
 	 * @var int
 	 */
@@ -84,6 +94,8 @@ final class IsShortArrayOrList
 
 	/**
 	 * The currently available cache for the current file.
+     *
+     * @since 1.0.0
 	 *
 	 * @var int
 	 */
@@ -91,6 +103,8 @@ final class IsShortArrayOrList
 
 	/**
 	 * The token stack from the current file.
+     *
+     * @since 1.0.0
 	 *
 	 * @var array
 	 */
@@ -98,6 +112,8 @@ final class IsShortArrayOrList
 
 	/**
 	 * The current open bracket.
+     *
+     * @since 1.0.0
 	 *
 	 * @var int
 	 */
@@ -105,28 +121,17 @@ final class IsShortArrayOrList
 
 	/**
 	 * The current close bracket.
+     *
+     * @since 1.0.0
 	 *
 	 * @var int
 	 */
 	private $closer;
 
 	/**
-	 * Operators which can be used with arrays (but not with lists).
-	 *
-	 * @var array
-	 */
-/*
-	private $arrayOperators = [
-		T_PLUS             => T_PLUS,
-		T_IS_EQUAL         => T_IS_EQUAL,
-		T_IS_IDENTICAL     => T_IS_IDENTICAL,
-		T_IS_NOT_EQUAL     => T_IS_NOT_EQUAL,
-		T_IS_NOT_IDENTICAL => T_IS_NOT_IDENTICAL,
-	];
-*/
-
-	/**
 	 * Constructor.
+     *
+     * @since 1.0.0
 	 *
 	 * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
 	 * @param int						  $stackPtr  The position of the short array bracket token.
@@ -167,29 +172,16 @@ final class IsShortArrayOrList
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param \PHP_CodeSniffer\Files\File $phpcsFile The file being scanned.
-	 * @param int						  $stackPtr  The position of the short array bracket token.
-	 *
-	 * @return string|false The type of construct this bracket was determined to be.
-	 *                      Either 'short array', 'short list' or 'square brackets'.
+	 * @return string Either 'short array', 'short list' or 'square brackets'.
 	 */
-	public function process()
+	public function solve()
 	{
 		if ($this->opener === $this->closer) {
 			// Parse error (unclosed bracket) or live coding. Bow out.
 			return self::SQUARE_BRACKETS;
 		}
 
-		return $this->solve();
-	}
-
-	/**
-	 *
-	 * @return string Either 'short array', 'short list' or 'square brackets'.
-	 */
-	protected function solve()
-	{
-		// Check if this is a bracket we need to examine.
+		// Check if this is a bracket we need to examine or a mistokenization.
 		if ($this->isShortArrayBracket() === false) {
 			return self::SQUARE_BRACKETS;
 		}
@@ -477,6 +469,8 @@ Probably not needed.
 	/**
 	 * Check previous cache entries to see if we can determine the type of the
 	 * current set of brackets based on that.
+     *
+     * @since 1.0.0
 	 *
 	 * @param int $prevBeforeOpener Stack pointer to first non-empty token before
 	 *                              the opener of the current set of brackets.
@@ -558,6 +552,8 @@ $array = [
 	 * Walk the first part of the contents of the brackets to see if we can determine if this is an array or short list.
 	 *
 	 * This won't walk the complete contents as that could be a huge performance drain. Just the first x items.
+     *
+     * @since 1.0.0
 	 *
 	 * @return string|false The determined type or FALSE if undetermined.
 	 */
@@ -566,26 +562,15 @@ $array = [
 		$items = PassedParameters::getParameters($this->phpcsFile, $this->opener, self::ITEM_LIMIT, true);
 
 		/*
-		 * Check if this could be a (nested) short list at all.
-		 * A list must have at least one variable inside and can not be empty.
-		 * /
-		$nonEmptyInside = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($this->opener + 1), $this->closer, true);
-		if ($nonEmptyInside === false) {
-			// This is an empty array.
+		 * A list can not be empty, so this must be an array.
+		 */
+		if ($items === []) {
 			return self::SHORT_ARRAY;
-		} elseif ($this->tokens[$nonEmptyInside]['code'] === \T_COMMA) {
-			// An array can not start with an empty entry, a list can.
-			return self::SHORT_LIST;
 		}
-		*/
 
 		/*
 		 * A list must have at least one variable inside and can not be empty, so this must be an array.
 		 */
-		if (empty($items) === true) {
-			return self::SHORT_ARRAY;
-		}
-
 		foreach ($items as $item) {
 			// TODO: check how an empty list item (only comma, no whitespace around it) presents....
 			// If we find an empty list item, it is definitely a short list.
@@ -600,7 +585,6 @@ $array = [
 			/*
 			 * If the "value" part of the entry doesn't start with a variable or a (nested) short list/array,
 			 * we know for sure that it will be an array.
-			 * Same, if the "value" part starts with an open bracket, but has other tokens after it.
 			 */
 			if ($this->tokens[$firstNonEmptyInValue]['code'] !== \T_VARIABLE
 				&& isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === false
@@ -608,6 +592,9 @@ $array = [
 				return self::SHORT_ARRAY;
 			}
 
+			/*
+			 * If the "value" part starts with an open bracket, but has other tokens after it, it will also be an array.
+			 */
 			$lastNonEmptyInValue = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, $item['end'], ($arrow + 1), true);
 			if (isset(Collections::$shortArrayTokensBC[$this->tokens[$firstNonEmptyInValue]['code']]) === true
 				&& isset($this->tokens[$firstNonEmptyInValue]['bracket_closer']) === true
@@ -615,33 +602,16 @@ $array = [
 			) {
 				return self::SHORT_ARRAY;
 			}
-			
+
 			if ($arrow === false) {
 				continue;
 			}
+
+			// Maybe examine key ?? if array it must be short list
 		}
 
 		// Undetermined.
 		return false;
-
-
-		/*
-		if entry starts with [:
-
-		- array before => the outer will be short list
-		- plain no key -> underdetermined, can still be both
-		- if not var nor [ => always array
-		*/
-
-
-
-// This will be slow for large nested arrays.
-		$varInside = $this->phpcsFile->findNext(\T_VARIABLE, $this->opener, $this->closer);
-		if ($varInside === false) {
-			// No variables, so definitely not a list.
-			return true;
-		}
-
 	}
 
 /*
