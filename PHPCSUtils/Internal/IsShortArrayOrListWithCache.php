@@ -150,7 +150,7 @@ final class IsShortArrayOrListWithCache
      *
      * @return self
      */
-    protected static function getInstance()
+    private static function getInstance()
     {
         if ((self::$instance instanceof self) === false) {
             self::$instance = new self();
@@ -172,7 +172,7 @@ final class IsShortArrayOrListWithCache
      *                      Either 'short array', 'short list' or 'square brackets'.
      *                      Or FALSE is this was not a bracket token.
      */
-    protected function process(File $phpcsFile, $stackPtr)
+    private function process(File $phpcsFile, $stackPtr)
     {
         if ($this->isValidStackPtr($phpcsFile, $stackPtr) === false) {
             return false;
@@ -216,7 +216,7 @@ final class IsShortArrayOrListWithCache
      *
      * @return bool
      */
-    protected function isValidStackPtr(File $phpcsFile, $stackPtr)
+    private function isValidStackPtr(File $phpcsFile, $stackPtr)
     {
         $tokens = $phpcsFile->getTokens();
         if (isset($tokens[$stackPtr]) === false
@@ -239,7 +239,7 @@ final class IsShortArrayOrListWithCache
      * @return string|false The previously determined type (which could be an empty string)
      *                      or FALSE if no cache entry was found for this token.
      */
-    protected function getFromCache(File $phpcsFile, $stackPtr)
+    private function getFromCache(File $phpcsFile, $stackPtr)
     {
         $fileName = $phpcsFile->getFilename();
         if (isset($this->seen[$fileName][$stackPtr]) === true) {
@@ -258,7 +258,7 @@ final class IsShortArrayOrListWithCache
      *
      * @return array
      */
-    protected function getCacheForFile(File $phpcsFile)
+    private function getCacheForFile(File $phpcsFile)
     {
         $fileName = $phpcsFile->getFilename();
         if (isset($this->seen[$fileName]) === true) {
@@ -280,7 +280,7 @@ final class IsShortArrayOrListWithCache
      *
      * @return void
      */
-    protected function updateCache($phpcsFile, $stackPtr, $type = '')
+    private function updateCache($phpcsFile, $stackPtr, $type = '')
     {
         $entry           = $this->cacheDefaults;
         $entry['opener'] = $stackPtr;
