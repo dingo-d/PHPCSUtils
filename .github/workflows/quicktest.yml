@@ -70,4 +70,5 @@ jobs:
         run: composer lint
 
       - name: Run the unit tests
-        run: vendor/bin/phpunit --no-coverage --enforce-time-limit
+#        run: vendor/bin/phpunit --no-coverage --enforce-time-limit
+        run: vendor/bin/phpunit --no-coverage --enforce-time-limit --filter IsShortArrayOrListWithCache
