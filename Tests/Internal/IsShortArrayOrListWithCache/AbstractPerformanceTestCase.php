@@ -20,6 +20,28 @@ use PHPCSUtils\TestUtils\UtilityMethodTestCase;
  */
 abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
 {
+	
+	/**
+	 * When to consider a run without a warmed cache to be slow.
+	 *
+	 * @var float
+	 */
+	const NOCACHE_RUNTIME_SLOW = 0.05; // 50 microseconds.
+
+	/**
+	 * Runtime limit for the test runs using a warmed cache.
+	 *
+	 * @var float
+	 */
+	const CACHE_RUNTIME_LIMIT = 0.025; // 25 microseconds.
+
+	/**
+	 * How much faster a run with a warmed up cache is expected to be compared to
+	 * a run without a warmed up cache.
+	 *
+	 * @var int
+	 */
+	const SPEEDUP_FACTOR = 20;
 
     /**
      * Full path to the test case file associated with this test class.
@@ -42,6 +64,57 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
         self::$caseFile = __DIR__ . '/' . static::TEST_FILE;
         parent::setUpTestFile();
     }
+
+	/**
+	 * Retrieve the runtime limit for when to consider a run without a warmed cache as slow.
+	 *
+	 * @return float
+	 */
+	protected function getNocacheRuntimeSlow()
+	{
+		if (\function_exists('xdebug_code_coverage_started')
+			&& xdebug_code_coverage_started() === true
+		) {
+			// Adjust the expected time to allow for slow down due to code coverage being on.
+			return (self::NOCACHE_RUNTIME_SLOW * 10);
+		}
+
+		return self::NOCACHE_RUNTIME_SLOW;
+	}
+
+	/**
+	 * Retrieve the runtime limit for runs with a warmed up cache.
+	 *
+	 * @return float
+	 */
+	protected function getCacheRuntimeLimit()
+	{
+		if (\function_exists('xdebug_code_coverage_started')
+			&& xdebug_code_coverage_started() === true
+		) {
+			// Adjust the expected time to allow for slow down due to code coverage being on.
+			return (self::CACHE_RUNTIME_LIMIT * 12);
+		}
+
+		return self::CACHE_RUNTIME_LIMIT;
+	}
+
+	/**
+	 * Retrieve the expected speed up factor for comparing runs with and without warmed up cache.
+	 *
+	 * @return int
+	 */
+	protected function getSpeedupFactor()
+	{
+		if (\function_exists('xdebug_code_coverage_started')
+			&& xdebug_code_coverage_started() === true
+		) {
+			// Adjust the expected time to allow for slow down due to code coverage being on.
+			return (self::SPEEDUP_FACTOR -5);
+		}
+
+		return self::SPEEDUP_FACTOR;
+	}
 
     /**
      * Verify that for all brackets it is correctly identified whether these are short arrays.

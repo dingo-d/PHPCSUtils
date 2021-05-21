@@ -62,16 +62,16 @@ class PerformanceIsShortArrayOnShortArrayWithoutKeysTest extends AbstractPerform
         $cachedTime = (\microtime(true) - $start);
 
         $this->assertLessThan(
-            0.025, // 25 microseconds.
+            $this->getCacheRuntimeLimit(),
             $cachedTime
         );
 
-        if ($time > 0.1) { // 100 microseconds.
+        if ($time > $this->getNocacheRuntimeSlow()) {
             /*
-             * Verify that retrieving the results from cache is at least 20 times faster than the original run.
+             * Verify that retrieving the results from cache is at least x times faster than the original run.
              */
             $this->assertGreaterThan(
-                20,
+                $this->getSpeedupFactor(),
                 ($time / $cachedTime),
                 'Short array determination was not significantly faster with a warmed up cache'
             );
