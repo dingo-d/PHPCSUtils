@@ -17,12 +17,9 @@ use PHPCSUtils\Tests\Internal\IsShortArrayOrListWithCache\AbstractPerformanceTes
  *
  * @covers \PHPCSUtils\Internal\IsShortArrayOrListWithCache
  *
- * @group arrays
- * @group lists
- *
  * @since 1.0.0
  */
-class IsShortListUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTestCase
+class PerformanceIsShortListOnShortArrayWithKeysTest extends AbstractPerformanceTestCase
 {
 
     /**
@@ -30,16 +27,17 @@ class IsShortListUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTes
      *
      * @var string
      */
-    const TEST_FILE = 'UnkeyedShortArrayPerformanceTest.inc';
+    const TEST_FILE = 'PerformanceShortArrayWithKeysTest.inc';
 
     /**
-     * Test the performance of the Lists::isShortList() function without caching.
+     * Test the performance of the IsShortArrayOrListWithCache::isShortList() function
+	 * without a cache in place.
      *
      * @small
      *
      * @return float
      */
-    public function testIsShortList()
+    public function testWithoutInitialCache()
     {
         $start = \microtime(true);
         $this->examineAllBracketsAsList(false);
@@ -47,10 +45,11 @@ class IsShortListUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTes
     }
 
     /**
-     * Test the performance of the Lists::isShortList() function again now the cache has been warmed up.
+     * Test the performance of the IsShortArrayOrListWithCache::isShortList() function again
+	 * now the cache has been warmed up.
      *
      * @small
-     * @depends testIsShortList
+     * @depends testWithoutInitialCache
      *
      * @param float $time Time the first test run examining all arrays took.
      *
@@ -58,20 +57,23 @@ class IsShortListUnkeyedShortArrayPerformanceTest extends AbstractPerformanceTes
      */
     public function testEffectOfCaching($time)
     {
+        if ($time < 0.3) { // 300 microseconds.
+            $this->markTestSkipped('Uncached run wasn\'t slow');
+        }
+
         $start = \microtime(true);
         $this->examineAllBracketsAsList(false);
         $cachedTime = (\microtime(true) - $start);
 
-        if ($time > 0.05) { // 50 microseconds = 0.05 second.
-            /*
-             * Verify that retrieving the results from cache is at least 15 times faster than the original run,
-             * providing the original run was slow.
-             */
-            $this->assertGreaterThan(
-                15,
-                ($time / $cachedTime),
-                'Short list determination was not significantly faster with a warmed up cache'
-            );
-        }
+        $this->assertLessThan(0.3, $cachedTime);
+
+        /*
+         * Verify that retrieving the results from cache is at least 15 times faster than the original run.
+         */
+        $this->assertGreaterThan(
+            15,
+            ($time / $cachedTime),
+            'Short list determination was not significantly faster with a warmed up cache'
+         );
     }
 }

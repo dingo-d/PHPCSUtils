@@ -14,10 +14,7 @@ use PHPCSUtils\Internal\IsShortArrayOrListWithCache;
 use PHPCSUtils\TestUtils\UtilityMethodTestCase;
 
 /**
- * Tests the performance of the "is short array/short list" determination to make sure it doesn't degrade.
- *
- * @group arrays
- * @group lists
+ * Helpers to test the performance of the "is short array/short list" determination to make sure it doesn't degrade.
  *
  * @since 1.0.0
  */
@@ -59,11 +56,16 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
         $i       = 0;
         $counter = 0;
         while (($i = self::$phpcsFile->findNext([\T_OPEN_SHORT_ARRAY, \T_OPEN_SQUARE_BRACKET], ($i + 1))) !== false) {
-            $this->assertSame(
-                $expect,
-                IsShortArrayOrListWithCache::isShortArray(self::$phpcsFile, $i),
-                'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
-            );
+            $result = IsShortArrayOrListWithCache::isShortArray(self::$phpcsFile, $i);
+            if ($result !== $expect) {
+                // Only use an assertion when the result is unexpected to prevent assertion inflation.
+                $this->assertSame(
+                    $expect,
+                    $result,
+                    'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
+                );
+            }
+
             ++$counter;
         }
 
@@ -83,11 +85,16 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
         $i       = 0;
         $counter = 0;
         while (($i = self::$phpcsFile->findNext([\T_OPEN_SHORT_ARRAY, \T_OPEN_SQUARE_BRACKET], ($i + 1))) !== false) {
-            $this->assertSame(
-                $expect,
-                IsShortArrayOrListWithCache::isShortList(self::$phpcsFile, $i),
-                'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
-            );
+            $result = IsShortArrayOrListWithCache::isShortList(self::$phpcsFile, $i);
+            if ($result !== $expect) {
+                // Only use an assertion when the result is unexpected to prevent assertion inflation.
+                $this->assertSame(
+                    $expect,
+                    $result,
+                    'Test failed for token ' . $i . ' of type ' . $tokens[$i]['type'] . ' on line ' . $tokens[$i]['line']
+                );
+            }
+
             ++$counter;
         }
 

@@ -1,7 +1,7 @@
 <?php
 
 // Test array taken from the PHPCompatibility sniff.
-class PerformanceTestOnKeyedLargeArray {
+class PerformanceTestForLargeArrayWithKeys {
     protected $newConstants = [
         'E_STRICT' => [
             '4.4' => false,
