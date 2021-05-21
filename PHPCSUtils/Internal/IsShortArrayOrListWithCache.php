@@ -148,6 +148,8 @@ final class IsShortArrayOrListWithCache
      *
      * @since 1.0.0
      *
+     * @codeCoverageIgnore
+     *
      * @return self
      */
     private static function getInstance()
