@@ -72,6 +72,7 @@ abstract class AbstractPerformanceTestCase extends UtilityMethodTestCase
 	 */
 	protected function getNocacheRuntimeSlow()
 	{
+//extension_loaded('xdebug')
 		if (\function_exists('xdebug_code_coverage_started')
 			&& xdebug_code_coverage_started() === true
 		) {
