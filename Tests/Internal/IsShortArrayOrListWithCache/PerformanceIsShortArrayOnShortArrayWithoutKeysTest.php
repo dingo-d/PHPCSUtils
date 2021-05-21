@@ -31,7 +31,7 @@ class PerformanceIsShortArrayOnShortArrayWithoutKeysTest extends AbstractPerform
 
     /**
      * Test the performance of the IsShortArrayOrListWithCache::isShortArray() function
-	 * without a cache in place.
+     * without a cache in place.
      *
      * @small
      *
@@ -46,7 +46,7 @@ class PerformanceIsShortArrayOnShortArrayWithoutKeysTest extends AbstractPerform
 
     /**
      * Test the performance of the IsShortArrayOrListWithCache::isShortArray() function again
-	 * now the cache has been warmed up.
+     * now the cache has been warmed up.
      *
      * @small
      * @depends testWithoutInitialCache
@@ -57,23 +57,24 @@ class PerformanceIsShortArrayOnShortArrayWithoutKeysTest extends AbstractPerform
      */
     public function testEffectOfCaching($time)
     {
-        if ($time < 0.3) { // 300 microseconds.
-            $this->markTestSkipped('Uncached run wasn\'t slow');
-        }
-
         $start = \microtime(true);
         $this->examineAllBracketsAsArray(true);
         $cachedTime = (\microtime(true) - $start);
 
-        $this->assertLessThan(0.3, $cachedTime);
-
-        /*
-         * Verify that retrieving the results from cache is at least 15 times faster than the original run.
-         */
-        $this->assertGreaterThan(
-            15,
-            ($time / $cachedTime),
-            'Short array determination was not significantly faster with a warmed up cache'
+        $this->assertLessThan(
+            0.025, // 25 microseconds.
+            $cachedTime
         );
+
+        if ($time > 0.1) { // 100 microseconds.
+            /*
+             * Verify that retrieving the results from cache is at least 20 times faster than the original run.
+             */
+            $this->assertGreaterThan(
+                20,
+                ($time / $cachedTime),
+                'Short array determination was not significantly faster with a warmed up cache'
+            );
+        }
     }
 }
