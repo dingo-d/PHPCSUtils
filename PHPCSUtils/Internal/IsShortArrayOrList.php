@@ -187,15 +187,10 @@ final class IsShortArrayOrList
 	 */
 	public function solve()
 	{
-		if ($this->opener === $this->closer) {
-			// Parse error (unclosed bracket) or live coding. Bow out.
+		if ($this->areSquareBrackets() === true) {
 			return self::SQUARE_BRACKETS;
 		}
 
-		// Check if this is a bracket we need to examine or a mistokenization.
-		if ($this->isShortArrayBracket() === false) {
-			return self::SQUARE_BRACKETS;
-		}
 
 		$prevBeforeOpener = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, ($this->opener - 1), null, true);
 		$nextAfterCloser  = $this->phpcsFile->findNext(Tokens::$emptyTokens, ($this->closer + 1), null, true);
@@ -347,9 +342,30 @@ Probably not needed.
   		return '';
 	}
 
+	/**
+	 * Check if the brackets are in actual fact square brackets.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool TRUE if these are real square brackets; FALSE otherwise.
+	 */
+	protected function areSquareBrackets()
+	{
+		if ($this->opener === $this->closer) {
+			// Parse error (unclosed bracket) or live coding. Bow out.
+			return true;
+		}
+
+		// Check if this is a bracket we need to examine or a mistokenization.
+		if ($this->isShortArrayBracket() === false) {
+			return true;
+		}
+
+		return false;
+	}
 
 	/**
-	 * Verify that the current open bracket is not affected by known PHPCS cross-version tokenizer issues.
+	 * Verify that the current set of brackets is not affected by known PHPCS cross-version tokenizer issues.
 	 *
 	 * @since 1.0.0
 	 *
@@ -405,71 +421,66 @@ Probably not needed.
 		}
 
 		/*
-		 * Deal with short array brackets which may be incorrectly tokenized plain square brackets.
+		 * Deal with T_OPEN_SHORT_ARRAY tokens which may be incorrectly tokenized plain square brackets.
 		 */
-		if ($this->tokens[$this->opener]['code'] === \T_OPEN_SHORT_ARRAY) {
 
-			/*
-			 * BC: Work around a bug in the tokenizer of PHPCS < 3.6.0 where dereferencing
-			 * of interpolated text string (PHP >= 8.0) would be incorrectly tokenized as short array.
-			 *
-			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3172
-			 */
-			if (\version_compare($this->phpcsVersion, '3.6.0', '<')
-				&& $this->tokens[$prevNonEmpty]['code'] === \T_DOUBLE_QUOTED_STRING
-			) {
+		/*
+		 * BC: Work around a bug in the tokenizer of PHPCS < 3.6.0 where dereferencing
+		 * of interpolated text string (PHP >= 8.0) would be incorrectly tokenized as short array.
+		 *
+		 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3172
+		 */
+		if (\version_compare($this->phpcsVersion, '3.6.0', '<')
+			&& $this->tokens[$prevNonEmpty]['code'] === \T_DOUBLE_QUOTED_STRING
+		) {
+			return false;
+		}
+
+		/*
+		 * BC: Work around a bug in the tokenizer of PHPCS < 3.5.6 where dereferencing
+		 * of magic constants (PHP >= 8.0) would be incorrectly tokenized as short array.
+		 * I.e. the square brackets in `__FILE__[0]` would be tokenized as short array.
+		 *
+		 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3013
+		 */
+		if (\version_compare($this->phpcsVersion, '3.5.6', '<')
+			&& isset(Collections::$magicConstants[$this->tokens[$prevNonEmpty]['code']]) === true
+		) {
+			return false;
+		}
+
+		/*
+		 * BC: Work around a bug in the tokenizer of PHPCS < 2.9.0 where array dereferencing
+		 * of short array and string literals would be incorrectly tokenized as short array.
+		 * I.e. the square brackets in `'PHP'[0]` would be tokenized as short array.
+		 *
+		 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1381
+		 */
+		if (\version_compare($this->phpcsVersion, '2.9.0', '<')
+		    && ($this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_SHORT_ARRAY
+				|| $this->tokens[$prevNonEmpty]['code'] === \T_CONSTANT_ENCAPSED_STRING)
+		) {
+			return false;
+		}
+
+		/*
+		 * BC: Work around a bug in the tokenizer of PHPCS 2.8.0 and 2.8.1 where array dereferencing
+		 * of a variable variable would be incorrectly tokenized as short array.
+		 *
+		 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
+		 */
+		if (\version_compare($this->phpcsVersion, '2.9.0', '<')
+			&& \version_compare($phpcsVersion, '2.8.0', '>=')
+			&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
+		) {
+			$openCurly	   = $this->tokens[$prevNonEmpty]['bracket_opener'];
+			$beforeCurlies = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, ($openCurly - 1), null, true);
+			if ($this->tokens[$beforeCurlies]['code'] === \T_DOLLAR) {
 				return false;
 			}
-
-			/*
-			 * BC: Work around a bug in the tokenizer of PHPCS < 3.5.6 where dereferencing
-			 * of magic constants (PHP >= 8.0) would be incorrectly tokenized as short array.
-			 * I.e. the square brackets in `__FILE__[0]` would be tokenized as short array.
-			 *
-			 * @link https://github.com/squizlabs/PHP_CodeSniffer/pull/3013
-			 */
-			if (\version_compare($this->phpcsVersion, '3.5.6', '<')
-				&& isset(Collections::$magicConstants[$this->tokens[$prevNonEmpty]['code']]) === true
-			) {
-				return false;
-			}
-
-			/*
-			 * BC: Work around a bug in the tokenizer of PHPCS < 2.9.0 where array dereferencing
-			 * of short array and string literals would be incorrectly tokenized as short array.
-			 * I.e. the square brackets in `'PHP'[0]` would be tokenized as short array.
-			 *
-			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1381
-			 */
-			if (\version_compare($this->phpcsVersion, '2.9.0', '<')
-			    && ($this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_SHORT_ARRAY
-					|| $this->tokens[$prevNonEmpty]['code'] === \T_CONSTANT_ENCAPSED_STRING)
-			) {
-				return false;
-			}
-
-			/*
-			 * BC: Work around a bug in the tokenizer of PHPCS 2.8.0 and 2.8.1 where array dereferencing
-			 * of a variable variable would be incorrectly tokenized as short array.
-			 *
-			 * @link https://github.com/squizlabs/PHP_CodeSniffer/issues/1284
-			 */
-			if (\version_compare($this->phpcsVersion, '2.9.0', '<')
-				&& \version_compare($phpcsVersion, '2.8.0', '>=')
-				&& $this->tokens[$prevNonEmpty]['code'] === \T_CLOSE_CURLY_BRACKET
-			) {
-				$openCurly	   = $this->tokens[$prevNonEmpty]['bracket_opener'];
-				$beforeCurlies = $this->phpcsFile->findPrevious(Tokens::$emptyTokens, ($openCurly - 1), null, true);
-				if ($this->tokens[$beforeCurlies]['code'] === \T_DOLLAR) {
-					return false;
-				}
-			}
-			
-			return true;
 		}
 		
-		// Unreachable as the only tokens which will ever be passed to this function are the ones accounted for.
-		return false;
+		return true;
 	}
 
 
