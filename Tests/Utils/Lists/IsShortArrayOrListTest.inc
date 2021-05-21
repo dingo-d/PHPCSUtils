@@ -41,6 +41,24 @@ $array = [$a];
 /* testShortArrayInComparison */
 if( [$a, /* testShortArrayNestedInComparison */ [$b]] === $array ) {};
 
+/* testShortArrayUnionFirst */
+$array = [1, 2] + /* testShortArrayUnionSecond */ [3, 4];
+
+/* testShortArrayEqualFirst */
+if([1, 2] == /* testShortArrayEqualSecond */ [3, 4]) {}
+
+/* testShortArrayIdenticalFirst */
+if([1, 2] === /* testShortArrayIdenticalSecond */ [3, 4]) {}
+
+/* testShortArrayInequalFirst */
+if([1, 2] != /* testShortArrayInequalSecond */ [3, 4]) {}
+
+/* testShortArrayInequalBracketsFirst */
+if([1, 2] <> /* testShortArrayInequalBracketsSecond */ [3, 4]) {}
+
+/* testShortArrayNonIdenticalFirst */
+if([1, 2] !== /* testShortArrayNonIdenticalSecond */ [3, 4]) {}
+
 /* testShortArrayInForeach */
 foreach ([1, 2, 3] as /* testShortListInForeach */ [$id, $name, $info]) {}
 
@@ -67,6 +85,9 @@ foreach ($array as [$a, /* testShortListInForeachNested */ [$b, $c]]) {}
 foreach ($data as ["id" => $id, "name" => $name]) {}
 
 echo 'just here to prevent the below test running into a tokenizer issue tested separately';
+
+/* testShortArrayInForeachWithNestedShortList */
+foreach([$a, $b, /* testShortListNestedInShortArrayInForeach */ [$d, $g, /* testNestedShortListNestedInShortArrayInForeach */ [$h]] = $array] as $c) {}
 
 /* testShortlistMultiAssign */
 $foo = [$baz, $bat] = /* testShortArrayMultiAssign */ [$a, $b] + [$c, $d];

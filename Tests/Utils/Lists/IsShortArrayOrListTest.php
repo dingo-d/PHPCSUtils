@@ -229,15 +229,99 @@ class IsShortArrayOrListTest extends UtilityMethodTestCase
                     'list'  => false,
                 ],
             ],
-            'comparison-no-assignment' => [
+            'short-array-comparison-no-assignment' => [
                 '/* testShortArrayInComparison */',
                 [
                     'array' => true,
                     'list'  => false,
                 ],
             ],
-            'comparison-no-assignment-nested' => [
+            'short-array-comparison-no-assignment-nested' => [
                 '/* testShortArrayNestedInComparison */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-union-before' => [
+                '/* testShortArrayUnionFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-union-after' => [
+                '/* testShortArrayUnionSecond */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-equal-before' => [
+                '/* testShortArrayEqualFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-equal-after' => [
+                '/* testShortArrayEqualSecond */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-identical-before' => [
+                '/* testShortArrayIdenticalFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-identical-after' => [
+                '/* testShortArrayIdenticalSecond */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-equal-before' => [
+                '/* testShortArrayInequalFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-equal-after' => [
+                '/* testShortArrayInequalSecond */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-equal-brackets-before' => [
+                '/* testShortArrayInequalBracketsFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-equal-brackets-after' => [
+                '/* testShortArrayInequalBracketsSecond */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-identical-before' => [
+                '/* testShortArrayNonIdenticalFirst */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-array-not-identical-after' => [
+                '/* testShortArrayNonIdenticalSecond */',
                 [
                     'array' => true,
                     'list'  => false,
@@ -314,6 +398,28 @@ class IsShortArrayOrListTest extends UtilityMethodTestCase
                     'list'  => true,
                 ],
                 \T_CLOSE_SHORT_ARRAY,
+            ],
+
+            'short-array-in-foreach-with-nested-shortlist' => [
+                '/* testShortArrayInForeachWithNestedShortList */',
+                [
+                    'array' => true,
+                    'list'  => false,
+                ],
+            ],
+            'short-list-nested-in-short-array-in-foreach' => [
+                '/* testShortArrayInForeachWithNestedShortList */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
+            ],
+            'nested-short-list-nested-in-short-array-in-foreach' => [
+                '/* testNestedShortListNestedInShortArrayInForeach */',
+                [
+                    'array' => false,
+                    'list'  => true,
+                ],
             ],
 
             'chained-assignment-short-list' => [
