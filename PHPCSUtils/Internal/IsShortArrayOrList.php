@@ -154,7 +154,7 @@ final class IsShortArrayOrList
 		if (isset($tokens[$stackPtr]) === false
 			|| isset(Collections::$shortArrayTokensBC[$tokens[$stackPtr]['code']]) === false
 		) {
-			throw new RuntimeException('Non-array bracket stackpointer passed');
+			throw new RuntimeException('Non-square bracket stack pointer passed');
 		}
 
 		$this->phpcsFile = $phpcsFile;
