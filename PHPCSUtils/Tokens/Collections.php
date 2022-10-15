@@ -496,18 +496,6 @@ class Collections
     ];
 
     /**
-     * Tokens which open PHP.
-     *
-     * @since 1.0.0-alpha4 Use the {@see Collections::phpOpenTags()} method for access.
-     *
-     * @return array <int|string> => <int|string>
-     */
-    private static $phpOpenTags = [
-        \T_OPEN_TAG           => \T_OPEN_TAG,
-        \T_OPEN_TAG_WITH_ECHO => \T_OPEN_TAG_WITH_ECHO,
-    ];
-
-    /**
      * DEPRECATED: Modifier keywords which can be used for a property declaration.
      *
      * @since 1.0.0-alpha1
