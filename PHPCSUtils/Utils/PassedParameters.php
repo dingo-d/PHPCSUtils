@@ -15,9 +15,6 @@ use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\Internal\Cache;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\Arrays;
-use PHPCSUtils\Utils\GetTokensAsString;
-use PHPCSUtils\Utils\NamingConventions;
 
 /**
  * Utility functions to retrieve information about parameters passed to function calls,

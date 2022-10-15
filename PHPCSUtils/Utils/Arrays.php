@@ -16,7 +16,6 @@ use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
 use PHPCSUtils\Internal\Cache;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\Lists;
 
 /**
  * Utility functions for use when examining arrays.

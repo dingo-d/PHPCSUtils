@@ -14,8 +14,6 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\Internal\Cache;
-use PHPCSUtils\Utils\Conditions;
-use PHPCSUtils\Utils\Parentheses;
 
 /**
  * Utility functions for examining use statements.

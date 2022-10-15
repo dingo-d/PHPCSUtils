@@ -14,7 +14,6 @@ use PHP_CodeSniffer\Exceptions\RuntimeException;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\GetTokensAsString;
 
 /**
  * Utility functions for use when examining object declaration statements.

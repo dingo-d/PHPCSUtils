@@ -16,9 +16,6 @@ use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\BCFile;
 use PHPCSUtils\Internal\Cache;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\Conditions;
-use PHPCSUtils\Utils\GetTokensAsString;
-use PHPCSUtils\Utils\Parentheses;
 
 /**
  * Utility functions for use when examining T_NAMESPACE tokens and to determine the

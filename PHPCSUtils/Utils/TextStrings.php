@@ -16,7 +16,6 @@ use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\Internal\Cache;
 use PHPCSUtils\Internal\NoFileCache;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\GetTokensAsString;
 
 /**
  * Utility functions for working with text string tokens.

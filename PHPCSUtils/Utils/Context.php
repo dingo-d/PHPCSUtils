@@ -11,7 +11,6 @@
 namespace PHPCSUtils\Utils;
 
 use PHP_CodeSniffer\Files\File;
-use PHPCSUtils\Utils\Parentheses;
 
 /**
  * Utility functions for examining in which context a certain token is used.

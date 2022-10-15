@@ -13,8 +13,6 @@ namespace PHPCSUtils\Utils;
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\Tokens\Collections;
-use PHPCSUtils\Utils\FunctionDeclarations;
-use PHPCSUtils\Utils\Parentheses;
 
 /**
  * Utility functions for use when working with operators.
